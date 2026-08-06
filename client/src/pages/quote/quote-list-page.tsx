@@ -1,10 +1,11 @@
 /**
  * 报价列表页。
+ * PC：表格（整行点击进详情）；移动端：卡片列表。
  */
 
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Eye, ArrowRight, Trash2, FileText, Download } from 'lucide-react';
+import { Plus, Download, Trash2, FileText, ChevronRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -33,7 +34,7 @@ export function QuoteListPage() {
 
   useEffect(() => {
     refresh();
-  }, [filter]);
+  }, [filter]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function refresh() {
     setLoading(true);
@@ -59,27 +60,28 @@ export function QuoteListPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="label-mono text-accent">QUOTES · 报价</div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">报价管理</h1>
-          <p className="mt-1 text-sm text-muted-foreground">新建报价、查看历史、转订单</p>
+          <h1 className="mt-1 text-xl font-bold tracking-tight lg:text-2xl">报价管理</h1>
+          <p className="mt-1 hidden text-sm text-muted-foreground sm:block">新建报价、查看历史、转订单</p>
         </div>
-        <Button variant="accent" onClick={() => navigate('/quotes/new')}>
+        <Button variant="accent" className="shrink-0" onClick={() => navigate('/quotes/new')}>
           <Plus className="h-4 w-4" />
           新建报价
         </Button>
       </div>
 
-      {/* 筛选 */}
-      <div className="flex gap-1">
+      {/* 筛选条：横滚模式 */}
+      <div className="flex gap-1 overflow-x-auto pb-1 sm:pb-0">
         {FILTERS.map((f) => (
           <Button
             key={f.key}
             variant={filter === f.key ? 'default' : 'ghost'}
             size="sm"
             onClick={() => setFilter(f.key)}
+            className="shrink-0"
           >
             {f.label}
           </Button>
@@ -99,77 +101,111 @@ export function QuoteListPage() {
           />
         </Card>
       ) : (
-        <Card className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead className="bg-primary text-primary-foreground">
-              <tr>
-                <th className="label-mono px-4 py-3 text-left font-medium">报价编号</th>
-                <th className="label-mono px-4 py-3 text-left font-medium">尺寸</th>
-                <th className="label-mono px-4 py-3 text-left font-medium">颜色</th>
-                <th className="label-mono px-4 py-3 text-right font-medium">金额</th>
-                <th className="label-mono px-4 py-3 text-left font-medium">状态</th>
-                <th className="label-mono px-4 py-3 text-left font-medium">时间</th>
-                <th className="label-mono px-4 py-3 text-right font-medium">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {records.map((r) => (
-                <tr key={r.id} className="border-b last:border-0 hover:bg-secondary/50">
-                  <td className="px-4 py-3 font-mono-display text-[13px] font-semibold">{r.quoteNo}</td>
-                  <td className="px-4 py-3 font-mono-display text-muted-foreground">
-                    {r.input.size.width}×{r.input.size.depth}×{r.input.size.height}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{COLOR_LABEL[r.input.color]}</td>
-                  <td className="px-4 py-3 text-right font-mono-display text-[13px] font-semibold">
-                    {formatMoney(r.result.finalPrice)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge variant={QUOTE_STATUS_BADGE[r.status]}>
-                      {QUOTE_STATUS_LABEL[r.status]}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3 font-mono-display text-xs text-muted-foreground">
-                    {formatDateTime(r.createdAt)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => navigate(`/quotes/${r.id}`)} title="查看/编辑">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setExportQuote(r)}
-                        title="导出"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={cn(r.status === 'converted' && 'opacity-40')}
-                        disabled={r.status === 'converted'}
-                        onClick={() => navigate(`/orders/new?fromQuote=${r.id}`)}
-                        title="转为订单"
-                      >
-                        <ArrowRight className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => handleDelete(r.id)}
-                        title="删除"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </td>
+        <>
+          {/* PC：表格（整行点击） */}
+          <Card className="hidden overflow-x-auto lg:block">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead className="bg-secondary/50 text-muted-foreground">
+                <tr>
+                  <th className="label-mono px-4 py-3 text-left font-medium">报价编号</th>
+                  <th className="label-mono px-4 py-3 text-left font-medium">尺寸</th>
+                  <th className="label-mono px-4 py-3 text-left font-medium">颜色</th>
+                  <th className="label-mono px-4 py-3 text-right font-medium">金额</th>
+                  <th className="label-mono px-4 py-3 text-left font-medium">状态</th>
+                  <th className="label-mono px-4 py-3 text-left font-medium">时间</th>
+                  <th className="label-mono px-4 py-3 text-right font-medium">操作</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
+              </thead>
+              <tbody>
+                {records.map((r) => (
+                  <tr
+                    key={r.id}
+                    className="cursor-pointer border-b last:border-0 hover:bg-secondary/50"
+                    onClick={() => navigate(`/quotes/${r.id}`)}
+                  >
+                    <td className="px-4 py-3 font-mono-display text-[13px] font-semibold">{r.quoteNo}</td>
+                    <td className="px-4 py-3 font-mono-display text-muted-foreground">
+                      {r.input.size.width}×{r.input.size.depth}×{r.input.size.height}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{COLOR_LABEL[r.input.color]}</td>
+                    <td className="px-4 py-3 text-right font-mono-display text-[13px] font-semibold">
+                      {formatMoney(r.result.finalPrice)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge variant={QUOTE_STATUS_BADGE[r.status]}>
+                        {QUOTE_STATUS_LABEL[r.status]}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 font-mono-display text-xs text-muted-foreground">
+                      {formatDateTime(r.createdAt)}
+                    </td>
+                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setExportQuote(r)}
+                          title="导出"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={cn('text-muted-foreground hover:text-destructive', r.status === 'converted' && 'opacity-40')}
+                          disabled={r.status === 'converted'}
+                          onClick={() => handleDelete(r.id)}
+                          title="删除"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          {/* 移动端：卡片列表 */}
+          <div className="space-y-2 lg:hidden">
+            {records.map((r) => (
+              <Card
+                key={r.id}
+                className="cursor-pointer p-3 transition-colors hover:bg-secondary/30"
+                onClick={() => navigate(`/quotes/${r.id}`)}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono-display text-[13px] font-semibold">{r.quoteNo}</span>
+                  <Badge variant={QUOTE_STATUS_BADGE[r.status]} className="text-[10px]">
+                    {QUOTE_STATUS_LABEL[r.status]}
+                  </Badge>
+                </div>
+                <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{COLOR_LABEL[r.input.color]}</span>
+                  <span className="font-mono-display">
+                    {r.input.size.width}×{r.input.size.depth}×{r.input.size.height}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-end justify-between">
+                  <div className="font-mono-display text-base font-bold">{formatMoney(r.result.finalPrice)}</div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={(e) => { e.stopPropagation(); setExportQuote(r); }}
+                      title="导出"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                    </Button>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
       )}
 
       <ExportDialog open={exportQuote !== null} onClose={() => setExportQuote(null)} quote={exportQuote} />

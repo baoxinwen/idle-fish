@@ -48,52 +48,43 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
 
   return (
     <div className="space-y-4">
-      {/* 尺寸 */}
+      {/* 机柜配置：尺寸 + 颜色 + 托盘 + 费用计入，合并一卡 */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">机柜尺寸（外径）</CardTitle>
+          <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">机柜配置</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-3 gap-3">
-          <NumberField label="宽" value={input.size.width} onChange={(v) => setSize('width', v)} suffix="mm" />
-          <NumberField label="深" value={input.size.depth} onChange={(v) => setSize('depth', v)} suffix="mm" />
-          <NumberField label="高" value={input.size.height} onChange={(v) => setSize('height', v)} suffix="mm" />
-        </CardContent>
-      </Card>
-
-      {/* 颜色 */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">型材颜色</CardTitle>
-        </CardHeader>
-        <CardContent className="flex gap-2">
-          {(['silver', 'black'] as const).map((c) => (
-            <Button
-              key={c}
-              variant={input.color === c ? 'default' : 'outline'}
-              onClick={() => setColor(c)}
-              className="flex-1"
-            >
-              <span
-                className={cn(
-                  'mr-2 h-3 w-3 rounded-full border',
-                  c === 'silver' ? 'bg-zinc-200' : 'bg-zinc-700',
-                )}
-              />
-              {COLOR_LABEL[c]}
-            </Button>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* 托盘 */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">托盘</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3">
-          <NumberField label="数量" value={input.trayCount} onChange={(v) => setTrayCount(v)} step={1} />
-          <NumberField label="单价" value={input.trayUnitPrice} onChange={(v) => setTrayUnitPrice(v)} step={0.01} suffix="元" />
-          <div className="col-span-2 flex items-center justify-between rounded-md bg-muted px-3 py-2 text-xs">
+        <CardContent className="space-y-4">
+          {/* 尺寸 */}
+          <div className="grid grid-cols-3 gap-3">
+            <NumberField label="宽" value={input.size.width} onChange={(v) => setSize('width', v)} suffix="mm" />
+            <NumberField label="深" value={input.size.depth} onChange={(v) => setSize('depth', v)} suffix="mm" />
+            <NumberField label="高" value={input.size.height} onChange={(v) => setSize('height', v)} suffix="mm" />
+          </div>
+          {/* 颜色 */}
+          <div className="flex gap-2">
+            {(['silver', 'black'] as const).map((c) => (
+              <Button
+                key={c}
+                variant={input.color === c ? 'default' : 'outline'}
+                onClick={() => setColor(c)}
+                className="flex-1"
+              >
+                <span
+                  className={cn(
+                    'mr-2 h-3 w-3 rounded-full border',
+                    c === 'silver' ? 'bg-zinc-200' : 'bg-zinc-700',
+                  )}
+                />
+                {COLOR_LABEL[c]}
+              </Button>
+            ))}
+          </div>
+          {/* 托盘 */}
+          <div className="grid grid-cols-2 gap-3">
+            <NumberField label="托盘数量" value={input.trayCount} onChange={(v) => setTrayCount(v)} step={1} />
+            <NumberField label="托盘单价" value={input.trayUnitPrice} onChange={(v) => setTrayUnitPrice(v)} step={0.01} suffix="元" />
+          </div>
+          <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-xs">
             <span className="text-muted-foreground">
               建议价：¥{suggestedPrice.toFixed(2)}（面积×A+B）
             </span>
@@ -102,46 +93,41 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
               填入
             </Button>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* 费用勾选：运费 / 安装费是否计入本次报价 */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm">费用计入</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          <label className="flex cursor-pointer items-center justify-between rounded-md border px-3 py-2 text-sm">
-            <span>
-              <span className="font-medium">运费</span>
-              <span className="ml-2 text-xs text-muted-foreground tabular">¥{input.pricing.freight.toFixed(2)}</span>
-            </span>
-            <input
-              type="checkbox"
-              checked={input.freightEnabled}
-              onChange={(e) => toggleFreight(e.target.checked)}
-              className="h-4 w-4 rounded border-input"
-            />
-          </label>
-          <label className="flex cursor-pointer items-center justify-between rounded-md border px-3 py-2 text-sm">
-            <span>
-              <span className="font-medium">安装费</span>
-              <span className="ml-2 text-xs text-muted-foreground tabular">¥{input.pricing.installFee.toFixed(2)}</span>
-            </span>
-            <input
-              type="checkbox"
-              checked={input.installEnabled}
-              onChange={(e) => toggleInstall(e.target.checked)}
-              className="h-4 w-4 rounded border-input"
-            />
-          </label>
+          {/* 费用计入 */}
+          <div className="space-y-2 border-t pt-3">
+            <Label className="text-xs text-muted-foreground">费用计入</Label>
+            <label className="flex cursor-pointer items-center justify-between rounded-md border px-3 py-2 text-sm">
+              <span>
+                <span className="font-medium">运费</span>
+                <span className="ml-2 text-xs text-muted-foreground tabular">¥{input.pricing.freight.toFixed(2)}</span>
+              </span>
+              <input
+                type="checkbox"
+                checked={input.freightEnabled}
+                onChange={(e) => toggleFreight(e.target.checked)}
+                className="h-4 w-4 rounded border-input"
+              />
+            </label>
+            <label className="flex cursor-pointer items-center justify-between rounded-md border px-3 py-2 text-sm">
+              <span>
+                <span className="font-medium">安装费</span>
+                <span className="ml-2 text-xs text-muted-foreground tabular">¥{input.pricing.installFee.toFixed(2)}</span>
+              </span>
+              <input
+                type="checkbox"
+                checked={input.installEnabled}
+                onChange={(e) => toggleInstall(e.target.checked)}
+                className="h-4 w-4 rounded border-input"
+              />
+            </label>
+          </div>
         </CardContent>
       </Card>
 
       {/* 配件 */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">配件清单</CardTitle>
+          <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">配件清单</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {CATEGORY_ORDER.map((cat) => {
@@ -191,7 +177,7 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
       <Card>
         <div className="flex w-full items-center justify-between p-4">
           <button className="flex items-center gap-2" onClick={() => setShowPricing((v) => !v)}>
-            <CardTitle className="text-sm">计价参数</CardTitle>
+            <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">计价参数</CardTitle>
             {showPricing ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </button>
           {showPricing && settings && (

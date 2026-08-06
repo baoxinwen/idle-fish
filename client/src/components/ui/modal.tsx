@@ -13,11 +13,12 @@ interface ModalProps {
 export function Modal({ open, onClose, title, children, className }: ModalProps) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div
         className={cn(
-          'relative z-10 w-full max-w-md rounded-lg border bg-card p-6 shadow-xl',
+          // 移动端：底部抽屉式贴底、圆角顶部、最大高度可滚；PC：居中卡片
+          'relative z-10 w-full max-h-[90vh] overflow-y-auto rounded-t-lg border bg-card p-4 shadow-xl sm:max-w-md sm:rounded-lg sm:p-6',
           className,
         )}
       >

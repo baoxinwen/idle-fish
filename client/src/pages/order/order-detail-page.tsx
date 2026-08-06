@@ -1,5 +1,5 @@
 /**
- * 订单详情页：完整信息展示 + 状态流转 + 发货核对。
+ * 订单详情页：完整信息展示 + 状态流转步骤条 + 发货核对。
  */
 
 import { useEffect, useState } from 'react';
@@ -17,7 +17,7 @@ import { useToast } from '@/components/toaster';
 import { LoadingState, EmptyState } from '@/components/states';
 import { confirmDialog } from '@/components/confirm-dialog';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_BADGE, CATEGORY_LABEL } from '@/lib/status';
-import { formatMoney, formatDateTime } from '@/lib/utils';
+import { formatMoney, formatDateTime, cn } from '@/lib/utils';
 import type { OrderRecord, OrderStatus } from '@idlefish/shared';
 
 /** 各状态可执行的动作 */
@@ -39,6 +39,17 @@ const ACTIONS: Partial<
   shipped: [{ label: '确认签收', next: 'done', icon: CheckCircle2, variant: 'default' }],
   done: [],
   cancelled: [],
+};
+
+/** 状态流转步骤（取消态单独处理） */
+const FLOW: OrderStatus[] = ['pending', 'producing', 'ready', 'shipped', 'done'];
+const FLOW_LABEL: Record<OrderStatus, string> = {
+  pending: '待生产',
+  producing: '生产中',
+  ready: '待发货',
+  shipped: '已发货',
+  done: '已完成',
+  cancelled: '已取消',
 };
 
 export function OrderDetailPage() {
@@ -102,65 +113,119 @@ export function OrderDetailPage() {
   }
 
   if (loading) return <LoadingState />;
-  if (!id) return <EmptyState text="订单不存在" />;
-  if (!record) return <EmptyState text="订单不存在" />;
+  if (!id || !record) return <EmptyState text="订单不存在" />;
 
   const actions = ACTIONS[record.status] ?? [];
   const canEdit = record.status === 'pending' || record.status === 'producing' || record.status === 'ready';
+  const currentStep = FLOW.indexOf(record.status);
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate('/orders')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
+            <div className="label-mono text-[10px] text-accent">ORDER · 订单</div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold tabular">{record.orderNo}</h1>
               <Badge variant={ORDER_STATUS_BADGE[record.status]}>
                 {ORDER_STATUS_LABEL[record.status]}
               </Badge>
             </div>
-            {record.quoteId && (
-              <p className="text-xs text-muted-foreground">由报价转入</p>
-            )}
+            {record.quoteId && <p className="text-xs text-muted-foreground">由报价转入</p>}
           </div>
         </div>
         {canEdit && (
-          <Button variant="outline" onClick={() => navigate(`/orders/${record.id}/edit`)}>
+          <Button variant="outline" className="shrink-0" onClick={() => navigate(`/orders/${record.id}/edit`)}>
             <Pencil className="h-4 w-4" />
             编辑
           </Button>
         )}
       </div>
 
-      {/* 状态流转动作 */}
-      {actions.length > 0 && (
-        <Card>
-          <CardContent className="flex flex-wrap gap-2 pt-6">
-            {actions.map((a) => {
-              const Icon = a.icon;
-              const isShip = a.next === 'shipped';
-              return (
-                <Button
-                  key={a.next}
-                  variant={a.variant}
-                  onClick={() => (isShip ? setShipOpen(true) : handleTransition(a.next))}
-                >
-                  <Icon className="h-4 w-4" />
-                  {a.label}
-                </Button>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
+      {/* 状态流转步骤条 */}
+      <Card>
+        <CardContent className="pt-6">
+          {record.status === 'cancelled' ? (
+            <div className="flex items-center justify-center gap-2 py-2 text-sm text-destructive">
+              <XCircle className="h-4 w-4" />
+              该订单已取消
+            </div>
+          ) : (
+            <>
+              {/* PC：横向步骤条 */}
+              <div className="hidden items-center sm:flex">
+                {FLOW.map((s, i) => {
+                  const done = i < currentStep;
+                  const active = i === currentStep;
+                  return (
+                    <div key={s} className="flex flex-1 items-center last:flex-none">
+                      <div className="flex flex-col items-center gap-1">
+                        <div
+                          className={cn(
+                            'flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium transition-colors',
+                            active && 'bg-accent text-accent-foreground ring-2 ring-accent/30 ring-offset-2 ring-offset-card',
+                            done && 'bg-accent/20 text-accent',
+                            !active && !done && 'bg-secondary text-muted-foreground',
+                          )}
+                        >
+                          {done ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
+                        </div>
+                        <span className={cn('text-[10px] whitespace-nowrap', active ? 'font-medium text-foreground' : 'text-muted-foreground')}>
+                          {FLOW_LABEL[s]}
+                        </span>
+                      </div>
+                      {i < FLOW.length - 1 && (
+                        <div className={cn('mx-1 h-0.5 flex-1 rounded', i < currentStep ? 'bg-accent' : 'bg-secondary')} />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* 移动端：紧凑进度提示 */}
+              <div className="flex items-center gap-2 sm:hidden">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-medium text-accent-foreground ring-2 ring-accent/30">
+                  {currentStep + 1}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-medium">{FLOW_LABEL[record.status]}</div>
+                  <div className="text-xs text-muted-foreground">第 {currentStep + 1}/{FLOW.length} 步 · {FLOW_LABEL[FLOW[currentStep + 1] ?? FLOW[currentStep]]}</div>
+                </div>
+                {/* 进度条 */}
+                <div className="ml-auto h-1.5 w-24 overflow-hidden rounded-full bg-secondary">
+                  <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${((currentStep + 1) / FLOW.length) * 100}%` }} />
+                </div>
+              </div>
+            </>
+          )}
+          {/* 操作按钮 */}
+          {actions.length > 0 && (
+            <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
+              {actions.map((a) => {
+                const Icon = a.icon;
+                const isShip = a.next === 'shipped';
+                return (
+                  <Button
+                    key={a.next}
+                    variant={a.variant}
+                    onClick={() => (isShip ? setShipOpen(true) : handleTransition(a.next))}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {a.label}
+                  </Button>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2">
         {/* 客户与收货 */}
         <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-sm">客户与收货</CardTitle></CardHeader>
+          <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">客户与收货</CardTitle></CardHeader>
           <CardContent className="space-y-3 text-sm">
             <InfoRow label="客户名称" value={record.customer.name} />
             <InfoRow label="平台订单号" value={record.customer.platformOrderNo || '—'} />
@@ -172,7 +237,7 @@ export function OrderDetailPage() {
 
         {/* 机柜与材料 */}
         <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-sm">机柜与材料</CardTitle></CardHeader>
+          <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">机柜与材料</CardTitle></CardHeader>
           <CardContent className="space-y-3 text-sm">
             <InfoRow
               label="尺寸"
@@ -200,10 +265,11 @@ export function OrderDetailPage() {
           </CardContent>
         </Card>
 
-        {/* 财务（预估） */}
-        <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-sm">财务（预估）</CardTitle></CardHeader>
-          <CardContent className="space-y-2 text-sm">
+        {/* 财务（预估）— accent 强调；移动端置顶 */}
+        <Card className="relative order-first overflow-hidden lg:order-none">
+          <span className="absolute left-0 top-4 bottom-4 w-1 rounded-r-full bg-accent" />
+          <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">财务（预估）</CardTitle></CardHeader>
+          <CardContent className="space-y-2 pl-4 text-sm">
             <InfoRow label="材料成本" value={formatMoney(record.finance.materialCost)} />
             <InfoRow label="其他费用" value={formatMoney(record.finance.otherFee)} />
             <InfoRow label="预估成本" value={formatMoney(record.finance.estimatedCost)} />
@@ -217,10 +283,10 @@ export function OrderDetailPage() {
           </CardContent>
         </Card>
 
-        {/* 发货信息（已发货才有） */}
+        {/* 发货信息 */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm">
+            <CardTitle className="label-mono flex items-center gap-2 text-xs font-semibold text-muted-foreground">
               <PackageCheck className="h-4 w-4" />
               发货与实际财务
             </CardTitle>
@@ -251,7 +317,7 @@ export function OrderDetailPage() {
 
       {record.remark && (
         <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-sm">备注</CardTitle></CardHeader>
+          <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">备注</CardTitle></CardHeader>
           <CardContent className="text-sm text-muted-foreground">{record.remark}</CardContent>
         </Card>
       )}
@@ -291,7 +357,7 @@ export function OrderDetailPage() {
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setShipOpen(false)}>取消</Button>
-            <Button onClick={handleShip}>
+            <Button variant="accent" onClick={handleShip}>
               <Truck className="h-4 w-4" />
               确认发货
             </Button>
@@ -317,13 +383,12 @@ function InfoRow({
     <div className="flex items-start justify-between gap-4">
       <span className="text-muted-foreground">{label}</span>
       <span
-        className={`tabular text-right ${bold ? 'font-semibold' : ''} ${
-          accent === 'good'
-            ? 'text-emerald-600 dark:text-emerald-400'
-            : accent === 'bad'
-              ? 'text-destructive'
-              : ''
-        }`}
+        className={cn(
+          'tabular text-right',
+          bold && 'font-semibold',
+          accent === 'good' && 'text-emerald-600 dark:text-emerald-400',
+          accent === 'bad' && 'text-destructive',
+        )}
       >
         {value}
       </span>

@@ -71,7 +71,7 @@ export function ExportDialog({ open, onClose, quote }: ExportDialogProps) {
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="导出" className="max-w-5xl">
+    <Modal open={open} onClose={onClose} title="导出" className="max-w-4xl">
       <div className="space-y-3">
         {/* 类型切换 */}
         <div className="flex gap-1">
@@ -85,8 +85,8 @@ export function ExportDialog({ open, onClose, quote }: ExportDialogProps) {
           </Button>
         </div>
 
-        {/* 预览（可滚动） */}
-        <div className="max-h-[60vh] overflow-auto rounded-md border bg-muted/30 p-4">
+        {/* 预览：800px 固定宽度（导出精度），容器溢出可滚 */}
+        <div className="max-h-[60vh] overflow-auto rounded-md border bg-muted/50 p-4">
           <div ref={nodeRef} className="mx-auto" style={{ width: 800 }}>
             {type === 'quote' ? <QuoteSheet quote={quote} /> : <ProductionSheet quote={quote} />}
           </div>
@@ -102,7 +102,7 @@ export function ExportDialog({ open, onClose, quote }: ExportDialogProps) {
             <Download className="h-4 w-4" />
             导出 PNG
           </Button>
-          <Button onClick={handlePdf} disabled={busy}>
+          <Button variant="accent" onClick={handlePdf} disabled={busy}>
             <Download className="h-4 w-4" />
             导出 PDF
           </Button>
