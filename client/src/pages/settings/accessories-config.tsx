@@ -25,18 +25,20 @@ export function AccessoriesConfig() {
         </Button>
       </CardHeader>
       <CardContent className="space-y-2">
-        <div className="grid grid-cols-[minmax(0,1fr)_120px_80px_100px_36px] gap-2 px-1 text-xs text-muted-foreground">
-          <div>名称</div>
-          <div>类别</div>
-          <div className="text-right">默认数量</div>
-          <div className="text-right">默认单价</div>
-          <div />
-        </div>
-        {settings.defaultAccessories.map((a, i) => (
-          <div
-            key={i}
-            className="grid grid-cols-[minmax(0,1fr)_120px_80px_100px_36px] items-center gap-2"
-          >
+        <div className="overflow-x-auto">
+          <div className="min-w-[480px] space-y-2">
+            <div className="grid grid-cols-[minmax(0,1fr)_120px_80px_100px_36px] gap-2 px-1 text-xs text-muted-foreground">
+              <div>名称</div>
+              <div>类别</div>
+              <div className="text-right">默认数量</div>
+              <div className="text-right">默认单价</div>
+              <div />
+            </div>
+            {settings.defaultAccessories.map((a, i) => (
+              <div
+                key={i}
+                className="grid grid-cols-[minmax(0,1fr)_120px_80px_100px_36px] items-center gap-2"
+              >
             <Input
               value={a.name}
               onChange={(e) => updateAccessory(i, { name: e.target.value })}
@@ -84,6 +86,8 @@ export function AccessoriesConfig() {
             暂无配件配置，点击「添加」
           </div>
         )}
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

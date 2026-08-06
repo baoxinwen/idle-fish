@@ -164,21 +164,23 @@ export function QuoteEditorPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate('/quotes')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
+            <div className="label-mono text-[10px] text-accent">QUOTE · 报价</div>
             <h1 className="text-xl font-bold">{editingId ? '编辑报价' : '新建报价'}</h1>
-            {editingId && <p className="text-xs text-muted-foreground">修改后保存将更新此报价</p>}
+            {editingId && <p className="hidden text-xs text-muted-foreground sm:block">修改后保存将更新此报价</p>}
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate('/quotes')}>取消</Button>
+        <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
+          <Button variant="outline" className="shrink-0" onClick={() => navigate('/quotes')}>取消</Button>
           {editingId && (
             <Button
               variant="outline"
+              className="shrink-0"
               onClick={async () => {
                 try {
                   // 取已存记录的元数据（编号/时间），但 input 用 store 实时值、result 重算，
@@ -200,6 +202,7 @@ export function QuoteEditorPage() {
           )}
           <Button
             variant="outline"
+            className="shrink-0"
             onClick={() => setConvertOpen(true)}
             disabled={saving || converting || editingStatus === 'converted'}
             title={editingStatus === 'converted' ? '该报价已转为订单' : undefined}
@@ -207,20 +210,36 @@ export function QuoteEditorPage() {
             <FilePlus className="h-4 w-4" />
             {editingStatus === 'converted' ? '已转单' : '转订单'}
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button variant="accent" className="shrink-0" onClick={handleSave} disabled={saving}>
             <Save className="h-4 w-4" />
             {saving ? '保存中…' : '保存'}
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         {/* 左：表单 */}
         <QuoteForm settings={settings} />
 
         {/* 右：3D + 成本明细 */}
         <div className="space-y-4">
-          <div className="h-[340px] rounded-lg border bg-card p-2">
+          {/* 3D 预览：工程蓝图风背景 + 顶部标签 + 右下尺寸参考 */}
+          <div className="relative h-[260px] overflow-hidden rounded-lg border bg-[radial-gradient(circle_at_50%_40%,#1E3A5F_0%,#0B1220_100%)] p-2 lg:h-[340px]">
+            {/* 细网格线（蓝图感） */}
+            <div
+              className="pointer-events-none absolute inset-0 opacity-20"
+              style={{
+                backgroundImage:
+                  'linear-gradient(#C9A96133 1px,transparent 1px),linear-gradient(90deg,#C9A96133 1px,transparent 1px)',
+                backgroundSize: '24px 24px',
+              }}
+            />
+            <div className="label-mono pointer-events-none absolute left-3 top-3 z-10 text-[10px] text-accent/80">
+              3D 预览 · 可拖拽旋转
+            </div>
+            <div className="label-mono pointer-events-none absolute bottom-3 right-3 z-10 rounded bg-black/30 px-2 py-1 text-[10px] text-accent/90 tabular">
+              {input.size.width}×{input.size.depth}×{input.size.height}mm
+            </div>
             <Cabinet3D size={input.size} color={input.color} />
           </div>
           <CostSummary />

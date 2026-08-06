@@ -33,7 +33,7 @@ export function StatCard({ label, value, hint, icon: Icon, accent = 'default' }:
       </div>
       <div
         className={cn(
-          'mt-2 pl-3 font-mono-display text-2xl font-bold tabular',
+          'mt-2 pl-3 font-mono-display text-lg font-bold tabular sm:text-2xl',
           accent === 'good' && 'text-emerald-600 dark:text-emerald-400',
           accent === 'bad' && 'text-destructive',
           accent === 'gold' && 'text-accent',
@@ -41,7 +41,7 @@ export function StatCard({ label, value, hint, icon: Icon, accent = 'default' }:
       >
         {value}
       </div>
-      {hint && <div className="label-mono mt-1.5 pl-3 text-muted-foreground/70">{hint}</div>}
+      {hint && <div className="label-mono mt-1.5 pl-3 text-[10px] text-muted-foreground/70 sm:text-xs">{hint}</div>}
     </Card>
   );
 }

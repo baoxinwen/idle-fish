@@ -211,21 +211,22 @@ export function OrderEditorPage() {
         <BackBar
           onBack={() => navigate('/orders')}
           title={mode === 'convert' ? '报价转订单' : mode === 'edit' ? '编辑订单' : '新建订单'}
+          code="ORDER · 订单"
         />
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => navigate('/orders')}>取消</Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button variant="accent" onClick={handleSave} disabled={saving}>
             <Save className="h-4 w-4" />
             {saving ? '保存中…' : '保存'}
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <div className="space-y-4">
           {/* 客户信息 */}
           <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-sm">客户信息</CardTitle></CardHeader>
+            <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">客户信息</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-1.5">
                 <Label>客户名称</Label>
@@ -256,7 +257,7 @@ export function OrderEditorPage() {
 
           {/* 收货信息 */}
           <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-sm">收货信息</CardTitle></CardHeader>
+            <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">收货信息</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
@@ -299,7 +300,7 @@ export function OrderEditorPage() {
 
           {/* 尺寸（转单只读） */}
           <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-sm">机柜尺寸</CardTitle></CardHeader>
+            <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">机柜尺寸</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-3 gap-3">
               {(['width', 'depth', 'height'] as const).map((f) => (
                 <NumberField
@@ -319,7 +320,7 @@ export function OrderEditorPage() {
           {/* 材料清单（转单只读展示，手动可编辑） */}
           <Card>
             <CardHeader className="flex-row items-center justify-between pb-3">
-              <CardTitle className="text-sm">材料清单</CardTitle>
+              <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">材料清单</CardTitle>
               {mode !== 'convert' && (
                 <Button
                   variant="ghost"
@@ -358,7 +359,7 @@ export function OrderEditorPage() {
         {/* 右：财务 */}
         <div className="space-y-4">
           <Card>
-            <CardHeader className="pb-3"><CardTitle className="text-sm">财务数据</CardTitle></CardHeader>
+            <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">财务数据</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 {mode === 'convert' ? (
@@ -434,13 +435,16 @@ export function OrderEditorPage() {
   );
 }
 
-function BackBar({ onBack, title }: { onBack: () => void; title: string }) {
+function BackBar({ onBack, title, code }: { onBack: () => void; title: string; code?: string }) {
   return (
     <div className="flex items-center gap-3">
       <Button variant="ghost" size="icon" onClick={onBack}>
         <ArrowLeft className="h-4 w-4" />
       </Button>
-      <h1 className="text-xl font-bold">{title}</h1>
+      <div>
+        {code && <div className="label-mono text-[10px] text-accent">{code}</div>}
+        <h1 className="text-xl font-bold">{title}</h1>
+      </div>
     </div>
   );
 }

@@ -60,31 +60,33 @@ export function SettingsPage() {
   const p = settings.defaultPricing;
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="label-mono text-accent">SETTINGS · 设置</div>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight">设置</h1>
-          <p className="mt-1 text-sm text-muted-foreground">默认机柜参数、计价参数、配件配置</p>
+          <h1 className="mt-1 text-xl font-bold tracking-tight lg:text-2xl">设置</h1>
+          <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
+            默认机柜参数、计价参数、配件配置
+          </p>
         </div>
         <div className="flex gap-2">
-          {dirty && <span className="self-center text-xs text-amber-500">未保存</span>}
+          {dirty && <span className="self-center text-xs text-amber-600 dark:text-amber-400">未保存</span>}
           <Button variant="outline" onClick={handleReload}>
             <RotateCcw className="h-4 w-4" />
             重载
           </Button>
-          <Button onClick={handleSave} disabled={saving || !dirty}>
+          <Button variant="accent" onClick={handleSave} disabled={saving || !dirty}>
             <Save className="h-4 w-4" />
             {saving ? '保存中…' : '保存'}
           </Button>
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2">
         {/* 默认尺寸 */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm">默认机柜尺寸</CardTitle>
+            <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">默认机柜尺寸</CardTitle>
             <CardDescription>新建报价/订单时自动带入</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-3 gap-3">
@@ -97,7 +99,7 @@ export function SettingsPage() {
         {/* 默认颜色与托盘 */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm">默认颜色与托盘</CardTitle>
+            <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">默认颜色与托盘</CardTitle>
             <CardDescription>新建报价时的初始值</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-3">
@@ -116,19 +118,37 @@ export function SettingsPage() {
         {/* 计价参数 */}
         <Card className="lg:col-span-2">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm">默认计价参数</CardTitle>
+            <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">默认计价参数</CardTitle>
             <CardDescription>单次报价可在报价页覆盖这些值</CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-3 md:grid-cols-3">
-            <NumberField label="银色型材单价" value={p.silverPrice} onChange={(v) => setPricing({ silverPrice: v })} step={0.01} suffix="元/m" />
-            <NumberField label="黑色型材单价" value={p.blackPrice} onChange={(v) => setPricing({ blackPrice: v })} step={0.01} suffix="元/m" />
-            <NumberField label="损耗率" value={p.wastage} onChange={(v) => setPricing({ wastage: v })} step={0.01} emptyValue={1} />
-            <ProfitRateField label="默认毛利率" value={p.profitRate} onChange={(v) => setPricing({ profitRate: v })} />
-            <NumberField label="切割处理费" value={p.cuttingFee} onChange={(v) => setPricing({ cuttingFee: v })} step={0.01} suffix="元" />
-            <NumberField label="安装费" value={p.installFee} onChange={(v) => setPricing({ installFee: v })} step={0.01} suffix="元" />
-            <NumberField label="运费" value={p.freight} onChange={(v) => setPricing({ freight: v })} step={0.01} suffix="元" />
-            <NumberField label="托盘系数 A" value={p.trayCoeffA} onChange={(v) => setPricing({ trayCoeffA: v })} step={0.01} />
-            <NumberField label="托盘系数 B" value={p.trayCoeffB} onChange={(v) => setPricing({ trayCoeffB: v })} step={0.01} />
+          <CardContent className="space-y-4">
+            {/* 型材相关 */}
+            <div>
+              <div className="label-mono mb-2 text-[10px] text-muted-foreground/70">型材</div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                <NumberField label="银色型材单价" value={p.silverPrice} onChange={(v) => setPricing({ silverPrice: v })} step={0.01} suffix="元/m" />
+                <NumberField label="黑色型材单价" value={p.blackPrice} onChange={(v) => setPricing({ blackPrice: v })} step={0.01} suffix="元/m" />
+                <NumberField label="损耗率" value={p.wastage} onChange={(v) => setPricing({ wastage: v })} step={0.01} emptyValue={1} />
+                <ProfitRateField label="默认毛利率" value={p.profitRate} onChange={(v) => setPricing({ profitRate: v })} />
+              </div>
+            </div>
+            {/* 费用相关 */}
+            <div>
+              <div className="label-mono mb-2 text-[10px] text-muted-foreground/70">费用</div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                <NumberField label="切割处理费" value={p.cuttingFee} onChange={(v) => setPricing({ cuttingFee: v })} step={0.01} suffix="元" />
+                <NumberField label="安装费" value={p.installFee} onChange={(v) => setPricing({ installFee: v })} step={0.01} suffix="元" />
+                <NumberField label="运费" value={p.freight} onChange={(v) => setPricing({ freight: v })} step={0.01} suffix="元" />
+              </div>
+            </div>
+            {/* 托盘系数 */}
+            <div>
+              <div className="label-mono mb-2 text-[10px] text-muted-foreground/70">托盘</div>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                <NumberField label="托盘系数 A" value={p.trayCoeffA} onChange={(v) => setPricing({ trayCoeffA: v })} step={0.01} />
+                <NumberField label="托盘系数 B" value={p.trayCoeffB} onChange={(v) => setPricing({ trayCoeffB: v })} step={0.01} />
+              </div>
+            </div>
           </CardContent>
         </Card>
 
