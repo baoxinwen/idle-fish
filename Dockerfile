@@ -29,7 +29,8 @@ RUN pnpm --filter @idlefish/shared build \
 
 # pnpm deploy 把 server 及其生产依赖（含 @idlefish/shared）打包到 /app/deploy
 # 产物：/app/deploy/node_modules、/app/deploy/dist、/app/deploy/package.json
-RUN pnpm --filter @idlefish/server deploy /app/deploy --prod
+# --legacy：pnpm v10 默认要求 inject-workspace-packages=true 才能 deploy，加此标志走传统 deploy
+RUN pnpm --filter @idlefish/server deploy /app/deploy --prod --legacy
 
 # ---------- runner ----------
 FROM node:20-bookworm-slim AS runner
