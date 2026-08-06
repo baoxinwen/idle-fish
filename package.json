@@ -1,0 +1,31 @@
+{
+  "name": "idlefish",
+  "version": "0.1.0",
+  "private": true,
+  "description": "铝型材机柜报价工具",
+  "scripts": {
+    "dev": "concurrently -n server,client -c blue,magenta \"pnpm --filter @idlefish/server dev\" \"pnpm --filter @idlefish/client dev\"",
+    "dev:server": "pnpm --filter @idlefish/server dev",
+    "dev:client": "pnpm --filter @idlefish/client dev",
+    "build": "pnpm --filter @idlefish/shared build && pnpm --filter @idlefish/client build && pnpm --filter @idlefish/server build",
+    "start": "pnpm --filter @idlefish/server start",
+    "test": "pnpm --filter @idlefish/shared test",
+    "lint": "eslint .",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0",
+    "playwright": "1.62.1",
+    "prettier": "^3.4.2"
+  },
+  "packageManager": "pnpm@10.18.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild"
+    ]
+  }
+}

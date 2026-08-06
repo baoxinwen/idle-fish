@@ -1,0 +1,41 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+build/
+
+# sqlite data
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+data/_uploads/
+# 首启 setup token（凭证，不可入库）
+data/setup-token
+# 运行/操作日志（winston 轮转文件）
+data/logs/
+
+# backups
+backups/
+
+# env
+.env
+.env.local
+
+# editor / os
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# 内部文档（需求/技术方案/审查记录，不公开）
+docs/
+
+# AI 协作指引（本地用，不上报）
+CLAUDE.md

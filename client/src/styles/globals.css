@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* 工程蓝图风色板：深墨蓝主色 + 暖金强调 + 冷白背景 + 石板灰文字 */
+    --background: 210 40% 98%;        /* #F8FAFC 冷白，比纯白柔和不刺眼 */
+    --foreground: 222 47% 11%;         /* #0F172A 深墨蓝主文字 */
+    --card: 0 0% 100%;                 /* 纯白卡片 */
+    --card-foreground: 222 47% 11%;
+    --primary: 222 47% 20%;            /* #1E293B 深墨蓝主色（按钮、选中） */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 215 28% 94%;          /* 浅石板灰 */
+    --secondary-foreground: 222 47% 11%;
+    --muted: 215 28% 94%;
+    --muted-foreground: 215 16% 47%;   /* #64748B 石板灰次要文字 */
+    --accent: 38 60% 56%;              /* #C9A961 暖金强调 */
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 88%;             /* #E2E8F0 浅灰边框 */
+    --input: 214 32% 88%;
+    --ring: 38 60% 56%;                /* 暖金聚焦环 */
+    --radius: 0.625rem;
+
+    /* 工程软件侧边栏专用深色 */
+    --sidebar: 222 47% 11%;            /* 深墨蓝底 */
+    --sidebar-foreground: 210 40% 90%;
+    --sidebar-accent: 38 60% 56%;      /* 暖金选中标记 */
+  }
+
+  .dark {
+    --background: 222 47% 8%;          /* 更深的墨蓝 */
+    --foreground: 210 40% 92%;
+    --card: 222 40% 12%;
+    --card-foreground: 210 40% 92%;
+    --primary: 210 40% 96%;            /* 深色模式主色反转为浅色 */
+    --primary-foreground: 222 47% 11%;
+    --secondary: 222 30% 18%;
+    --secondary-foreground: 210 40% 92%;
+    --muted: 222 30% 18%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 38 55% 60%;              /* 暖金在深色下稍亮 */
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 222 30% 22%;
+    --input: 222 30% 22%;
+    --ring: 38 55% 60%;
+    --sidebar: 222 47% 6%;
+    --sidebar-foreground: 210 40% 88%;
+    --sidebar-accent: 38 55% 60%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-feature-settings: 'tnum' 1;
+    font-family: 'Inter', system-ui, -apple-system, 'Microsoft YaHei', sans-serif;
+  }
+  /* 数字等宽对齐金额、编号、尺寸 */
+  .tabular,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer utilities {
+  /* 工程标签：等宽小号 + 字间距，用于标签、编号、小标题 */
+  .label-mono {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    font-variant-numeric: tabular-nums;
+  }
+  .font-mono-display {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
