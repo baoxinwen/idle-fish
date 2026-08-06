@@ -1,36 +1,18 @@
-# IdleFish — 铝型材机柜报价工具
-# 单服务 + 数据卷。经 nginx/Caddy 反向代理对外（HTTPS 在代理层终结），同域名访问。
-# 使用：docker compose up -d
-# 镜像由 GitHub Actions 自动构建并推送至 GHCR
-#
-# 部署要点（公网）：
-#  1. 必须经反向代理（nginx/Caddy）对外，代理需覆盖 X-Forwarded-For 为真实客户端 IP
-#     （nginx 用 proxy_set_header X-Forwarded-For $remote_addr; 勿用 $proxy_add_x_forwarded_for）
-#  2. 首启 setup token 自动生成：首次启动容器会随机生成 token 并打到日志（docker logs idlefish），
-#     持久化到 /data/setup-token。在 /setup 页填入此 token 创建管理员。首启完成后可忽略（setup 返回 409）
-#  3. trust proxy 需与反代跳数匹配（单层反代=1）；未用反代直暴公网时设 0，否则可被伪造 XFF 绕限流
-
 services:
   idlefish:
     image: ghcr.io/baoxinwen/idlefish:latest
     container_name: idlefish
     restart: unless-stopped
     ports:
-      # 0.0.0.0:3000，经反向代理(nginx/Caddy)对外提供；鉴权在应用层
       - "3000:3000"
     volumes:
-      # SQLite 数据持久化（报价/订单/设置/用户/会话 + 首启 setup token）
       - idlefish-data:/data
     environment:
       - NODE_ENV=production
       - PORT=3000
-      # 容器内绑 0.0.0.0（docker-proxy 连入）
       - IDLEFISH_HOST=0.0.0.0
-      # 反代跳数：单层反代=1（默认），未用反代=0。错误配置会削弱登录限流
       - IDLEFISH_TRUST_PROXY=1
-      # 数据目录（容器内）
       - IDLEFISH_DATA_DIR=/data
-      # 时区（报价编号按本地日期，建议设为东八区）
       - TZ=Asia/Shanghai
 
 volumes:

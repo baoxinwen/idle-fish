@@ -34,6 +34,10 @@ RUN pnpm --filter @idlefish/server deploy /app/deploy --prod
 # ---------- runner ----------
 FROM node:20-bookworm-slim AS runner
 
+# gosu：entrypoint 以 root 修正 /data 权限后切 appuser
+RUN apt-get update && apt-get install -y --no-install-recommends gosu \
+    && rm -rf /var/lib/apt/lists/*
+
 # 非 root 用户运行，降低容器逃逸风险
 RUN groupadd --system --gid 1001 appgrp \
     && useradd --system --uid 1001 --gid appgrp --create-home appuser
@@ -45,17 +49,13 @@ COPY --from=builder /app/deploy ./server
 # 前端构建产物（server 静态托管）
 COPY --from=builder /app/client/dist ./client/dist
 
-# 数据目录由 appuser 拥有（VOLUME 在运行时挂载，此处先建空目录并赋权）
-RUN mkdir -p /data && chown -R appuser:appgrp /data /app
-
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV IDLEFISH_DATA_DIR=/data
 
-USER appuser
-
-VOLUME ["/data"]
+# 不在此处 USER appuser——entrypoint 需以 root 启动修正 /data 权限后再切
 EXPOSE 3000
 
-# server/dist/index.js 启动；cwd=/app 使静态托管路径 client/dist 正确
-CMD ["node", "server/dist/index.js"]
+# entrypoint：root 修正 /data 属主 → gosu 切 appuser → 执行 node
+# named volume 挂载后 /data 属主可能是 root，appuser 无写权限会导致 mkdir /data/logs 失败
+ENTRYPOINT ["sh", "-c", "chown -R appuser:appgrp /data && exec gosu appuser node server/dist/index.js"]
