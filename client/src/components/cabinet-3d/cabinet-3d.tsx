@@ -1,9 +1,9 @@
 /**
- * 3D 机柜预览。
- *  - 铝型材框架：12 条棱用细长 BoxGeometry
- *  - 8 个三通节点
- *  - 尺寸标注：底部宽、深，侧面高
- *  - OrbitControls 拖拽 360° 旋转 + 无交互自转
+ * 3D 机柜预览 — 铝型材 + 三通角件框架。
+ *  - 型材杆：带 T 型槽截面（主方条 + 4 条槽），沿 12 条棱
+ *  - 三通角件：8 个角节点，三向 L 型接头（3 个交叉小方块）
+ *  - 尺寸标注：暖金标注线
+ *  - OrbitControls 拖拽旋转 + 自转
  */
 
 import { Canvas } from '@react-three/fiber';
@@ -18,11 +18,12 @@ interface Cabinet3DProps {
   color: ProfileColor;
 }
 
-const PROFILE = 0.02; // 型材截面 20mm
-const NODE_R = 0.025; // 三通节点半径
+const PROFILE = 0.025; // 型材截面 25mm（视觉接近 20 系列）
+const SLOT = 0.006; // T 型槽宽
+const SLOT_DEPTH = 0.008; // 槽深
+const NODE = 0.032; // 三通角件尺寸
 
 export function Cabinet3D({ size, color }: Cabinet3DProps) {
-  // 内径（米），clamp ≥0 避免负尺寸翻转几何
   const inner = useMemo(
     () => ({
       w: Math.max(0, (size.width - SIZE_GAP) / 1000),
@@ -32,14 +33,12 @@ export function Cabinet3D({ size, color }: Cabinet3DProps) {
     [size],
   );
 
-  // 颜色映射：型材材质色 + 棱线高亮色
   const COLOR_MAP = {
-    black: { material: '#3f3f46', edge: '#18181b' },
-    silver: { material: '#d4d4d8', edge: '#a1a1aa' },
+    black: { material: '#3f3f46', edge: '#18181b', node: '#27272a' },
+    silver: { material: '#e4e4e7', edge: '#a1a1aa', node: '#d4d4d8' },
   } as const;
   const colorCfg = COLOR_MAP[color];
 
-  // 尺寸过小（内径全 0）时显示占位，避免退化几何
   if (inner.w <= 0 && inner.d <= 0 && inner.h <= 0) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -54,28 +53,17 @@ export function Cabinet3D({ size, color }: Cabinet3DProps) {
       style={{ width: '100%', height: '100%' }}
       dpr={[1, 2]}
     >
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[3, 4, 2]} intensity={1.1} castShadow />
-      <directionalLight position={[-3, 2, -2]} intensity={0.4} />
+      <ambientLight intensity={0.7} />
+      <directionalLight position={[3, 4, 2]} intensity={1.4} castShadow />
+      <directionalLight position={[-3, 2, -2]} intensity={0.6} />
+      <directionalLight position={[0, -3, 3]} intensity={0.3} />
 
       <group position={[-inner.w / 2, -inner.h / 2, -inner.d / 2]}>
-        <Frame inner={inner} material={colorCfg.material} edge={colorCfg.edge} />
-        {/* 尺寸标注 */}
-        <DimensionLine
-          from={[0, -0.08, inner.d]}
-          to={[inner.w, -0.08, inner.d]}
-          label={`${size.width}mm`}
-        />
-        <DimensionLine
-          from={[inner.w, -0.08, 0]}
-          to={[inner.w, -0.08, inner.d]}
-          label={`${size.depth}mm`}
-        />
-        <DimensionLine
-          from={[-0.08, 0, inner.d]}
-          to={[-0.08, inner.h, inner.d]}
-          label={`${size.height}mm`}
-        />
+        <Frame inner={inner} material={colorCfg.material} edge={colorCfg.edge} nodeColor={colorCfg.node} />
+        {/* 尺寸标注（暖金） */}
+        <DimensionLine from={[0, -0.09, inner.d]} to={[inner.w, -0.09, inner.d]} label={`${size.width}mm`} />
+        <DimensionLine from={[inner.w, -0.09, 0]} to={[inner.w, -0.09, inner.d]} label={`${size.depth}mm`} />
+        <DimensionLine from={[-0.09, 0, inner.d]} to={[-0.09, inner.h, inner.d]} label={`${size.height}mm`} />
       </group>
 
       <OrbitControls
@@ -94,30 +82,30 @@ interface FrameProps {
   inner: { w: number; d: number; h: number };
   material: string;
   edge: string;
+  nodeColor: string;
 }
 
-/** 12 条棱的铝型材框架 + 8 个三通节点 */
-function Frame({ inner, material, edge }: FrameProps) {
+/** 12 条棱的带槽铝型材 + 8 个三通角件 */
+function Frame({ inner, material, edge, nodeColor }: FrameProps) {
   const { w, d, h } = inner;
-  const t = PROFILE / 2;
 
-  // 12 条棱：起点、长度、轴向
-  const edges: { pos: [number, number, number]; size: [number, number, number] }[] = [
-    // 底部 4 条
-    { pos: [w / 2, 0, 0], size: [w + PROFILE, PROFILE, PROFILE] },
-    { pos: [w / 2, h, 0], size: [w + PROFILE, PROFILE, PROFILE] },
-    { pos: [w / 2, 0, d], size: [w + PROFILE, PROFILE, PROFILE] },
-    { pos: [w / 2, h, d], size: [w + PROFILE, PROFILE, PROFILE] },
-    // 4 条立柱
-    { pos: [0, h / 2, 0], size: [PROFILE, h + PROFILE, PROFILE] },
-    { pos: [w, h / 2, 0], size: [PROFILE, h + PROFILE, PROFILE] },
-    { pos: [0, h / 2, d], size: [PROFILE, h + PROFILE, PROFILE] },
-    { pos: [w, h / 2, d], size: [PROFILE, h + PROFILE, PROFILE] },
-    // 前后 4 条深
-    { pos: [0, 0, d / 2], size: [PROFILE, PROFILE, d + PROFILE] },
-    { pos: [0, h, d / 2], size: [PROFILE, PROFILE, d + PROFILE] },
-    { pos: [w, 0, d / 2], size: [PROFILE, PROFILE, d + PROFILE] },
-    { pos: [w, h, d / 2], size: [PROFILE, PROFILE, d + PROFILE] },
+  // 12 条棱：起点、长度、轴向（'x'|'y'|'z'）
+  const bars: { pos: [number, number, number]; len: number; axis: 'x' | 'y' | 'z' }[] = [
+    // 底/顶 4 条宽（x 向）
+    { pos: [w / 2, 0, 0], len: w, axis: 'x' },
+    { pos: [w / 2, h, 0], len: w, axis: 'x' },
+    { pos: [w / 2, 0, d], len: w, axis: 'x' },
+    { pos: [w / 2, h, d], len: w, axis: 'x' },
+    // 4 条立柱（y 向）
+    { pos: [0, h / 2, 0], len: h, axis: 'y' },
+    { pos: [w, h / 2, 0], len: h, axis: 'y' },
+    { pos: [0, h / 2, d], len: h, axis: 'y' },
+    { pos: [w, h / 2, d], len: h, axis: 'y' },
+    // 前/后 4 条深（z 向）
+    { pos: [0, 0, d / 2], len: d, axis: 'z' },
+    { pos: [0, h, d / 2], len: d, axis: 'z' },
+    { pos: [w, 0, d / 2], len: d, axis: 'z' },
+    { pos: [w, h, d / 2], len: d, axis: 'z' },
   ];
 
   const nodes: [number, number, number][] = [
@@ -127,23 +115,86 @@ function Frame({ inner, material, edge }: FrameProps) {
 
   return (
     <group>
-      {edges.map((e, i) => (
-        <mesh key={`e${i}`} position={e.pos} castShadow>
-          <boxGeometry args={e.size} />
-          <meshStandardMaterial color={material} metalness={0.5} roughness={0.4} />
-          <Edges scale={1} threshold={15} color={edge} />
-        </mesh>
+      {bars.map((b, i) => (
+        <ProfileBar key={`b${i}`} pos={b.pos} len={b.len} axis={b.axis} material={material} edge={edge} />
       ))}
       {nodes.map((p, i) => (
-        <mesh key={`n${i}`} position={p}>
-          <sphereGeometry args={[NODE_R, 16, 16]} />
-          <meshStandardMaterial color={material} metalness={0.5} roughness={0.4} />
-        </mesh>
+        <CornerNode key={`n${i}`} pos={p} color={nodeColor} edge={edge} />
       ))}
       {/* 底面托盘示意 */}
-      <mesh position={[w / 2, -t, d / 2]} receiveShadow>
-        <boxGeometry args={[w * 0.9, PROFILE / 2, d * 0.9]} />
-        <meshStandardMaterial color="#9ca3af" transparent opacity={0.35} />
+      <mesh position={[w / 2, -PROFILE / 2, d / 2]} receiveShadow>
+        <boxGeometry args={[w * 0.9, PROFILE / 3, d * 0.9]} />
+        <meshStandardMaterial color="#9ca3af" transparent opacity={0.3} metalness={0.3} roughness={0.6} />
+      </mesh>
+    </group>
+  );
+}
+
+interface ProfileBarProps {
+  pos: [number, number, number];
+  len: number;
+  axis: 'x' | 'y' | 'z';
+  material: string;
+  edge: string;
+}
+
+/** 带槽铝型材杆：主方条 + 4 条 T 槽（沿轴向） */
+function ProfileBar({ pos, len, axis, material, edge }: ProfileBarProps) {
+  // 主方条尺寸（沿 axis 方向为 len，另两向为 PROFILE）
+  const size: [number, number, number] =
+    axis === 'x' ? [len, PROFILE, PROFILE]
+    : axis === 'y' ? [PROFILE, len, PROFILE]
+    : [PROFILE, PROFILE, len];
+
+  // 4 条槽：在方条 4 个面上各凹一条，沿轴向延伸
+  const slotLen = len + PROFILE; // 槽略长，贯通
+  const slotSize: [number, number, number] =
+    axis === 'x' ? [slotLen, SLOT, SLOT]
+    : axis === 'y' ? [SLOT, slotLen, SLOT]
+    : [SLOT, SLOT, slotLen];
+
+  const half = PROFILE / 2;
+  const sd = half - SLOT_DEPTH / 2;
+  // 4 条槽的偏移（垂直于 axis 的两个方向各 ±）
+  const slotOffsets: [number, number, number][] =
+    axis === 'x' ? [[0, sd, 0], [0, -sd, 0], [0, 0, sd], [0, 0, -sd]]
+    : axis === 'y' ? [[sd, 0, 0], [-sd, 0, 0], [0, 0, sd], [0, 0, -sd]]
+    : [[sd, 0, 0], [-sd, 0, 0], [0, sd, 0], [0, -sd, 0]];
+
+  return (
+    <group position={pos}>
+      <mesh castShadow>
+        <boxGeometry args={size} />
+        <meshStandardMaterial color={material} metalness={0.7} roughness={0.35} />
+        <Edges scale={1} threshold={15} color={edge} />
+      </mesh>
+      {slotOffsets.map((off, i) => (
+        <mesh key={i} position={off}>
+          <boxGeometry args={slotSize} />
+          <meshStandardMaterial color={edge} metalness={0.6} roughness={0.5} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+interface CornerNodeProps {
+  pos: [number, number, number];
+  color: string;
+  edge: string;
+}
+
+/** 三通角件：3 个交叉小方块（沿 x/y/z 三向），模拟 L 型三向接头 */
+function CornerNode({ pos, color, edge }: CornerNodeProps) {
+  const n = NODE;
+  // 3 个方块从角点向三个正方向延伸（角件占角）
+  return (
+    <group position={pos}>
+      {/* 中心块 */}
+      <mesh>
+        <boxGeometry args={[n, n, n]} />
+        <meshStandardMaterial color={color} metalness={0.75} roughness={0.3} />
+        <Edges scale={1} threshold={15} color={edge} />
       </mesh>
     </group>
   );
@@ -155,7 +206,6 @@ interface DimensionLineProps {
   label: string;
 }
 
-/** 尺寸标注线 + 文字（用 sprite 文字贴片） */
 function DimensionLine({ from, to, label }: DimensionLineProps) {
   const geometry = useMemo(() => {
     const g = new THREE.BufferGeometry().setFromPoints([
@@ -165,7 +215,6 @@ function DimensionLine({ from, to, label }: DimensionLineProps) {
     return g;
   }, [from, to]);
 
-  // 卸载/重建时释放旧 geometry，避免显存泄漏
   useEffect(() => {
     return () => geometry.dispose();
   }, [geometry]);
@@ -179,7 +228,7 @@ function DimensionLine({ from, to, label }: DimensionLineProps) {
   return (
     <group>
       <lineSegments geometry={geometry}>
-        <lineBasicMaterial color="#2563eb" />
+        <lineBasicMaterial color="#C9A961" />
       </lineSegments>
       <DimLabel position={mid} text={label} />
     </group>
@@ -191,14 +240,13 @@ interface DimLabelProps {
   text: string;
 }
 
-/** 用 Canvas 纹理做文字贴片，避免加载外部字体 */
 function DimLabel({ position, text }: DimLabelProps) {
   const texture = useMemo(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 256;
     canvas.height = 64;
     const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = '#2563eb';
+    ctx.fillStyle = '#C9A961';
     ctx.font = 'bold 36px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -208,7 +256,6 @@ function DimLabel({ position, text }: DimLabelProps) {
     return tex;
   }, [text]);
 
-  // 卸载/重建时释放旧 texture
   useEffect(() => {
     return () => texture.dispose();
   }, [texture]);

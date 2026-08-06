@@ -31,26 +31,26 @@
   }
 
   .dark {
-    --background: 222 47% 8%;          /* 更深的墨蓝 */
+    --background: 222 47% 6%;           /* 更深的墨蓝底，与卡片拉开对比 */
     --foreground: 210 40% 92%;
-    --card: 222 40% 12%;
+    --card: 222 40% 13%;                /* 卡片比底略亮，层次清晰 */
     --card-foreground: 210 40% 92%;
     --primary: 210 40% 96%;            /* 深色模式主色反转为浅色 */
     --primary-foreground: 222 47% 11%;
-    --secondary: 222 30% 18%;
+    --secondary: 222 30% 20%;           /* 次要背景提亮，hover/选中更可见 */
     --secondary-foreground: 210 40% 92%;
-    --muted: 222 30% 18%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 38 55% 60%;              /* 暖金在深色下稍亮 */
+    --muted: 222 30% 20%;
+    --muted-foreground: 215 20% 68%;   /* 次要文字提亮，深色下更易读 */
+    --accent: 38 60% 62%;              /* 暖金在深色下更亮，保证可见 */
     --accent-foreground: 222 47% 11%;
-    --destructive: 0 62% 50%;
+    --destructive: 0 62% 55%;          /* 红色提亮 */
     --destructive-foreground: 0 0% 100%;
-    --border: 222 30% 22%;
-    --input: 222 30% 22%;
-    --ring: 38 55% 60%;
-    --sidebar: 222 47% 6%;
+    --border: 222 25% 25%;             /* 边框提亮，深色下轮廓清晰 */
+    --input: 222 25% 25%;
+    --ring: 38 60% 62%;
+    --sidebar: 222 47% 5%;
     --sidebar-foreground: 210 40% 88%;
-    --sidebar-accent: 38 55% 60%;
+    --sidebar-accent: 38 60% 62%;
   }
 }
 
@@ -58,11 +58,33 @@
   * {
     border-color: hsl(var(--border));
   }
+  /* PC（≥1024px）根字号放大，所有 rem 字号同比增大一档（14→15.4 等），移动端不变 */
+  @media (min-width: 1024px) {
+    html {
+      font-size: 17px;
+    }
+  }
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     font-feature-settings: 'tnum' 1;
     font-family: 'Inter', system-ui, -apple-system, 'Microsoft YaHei', sans-serif;
+    transition: background-color 0.2s, color 0.2s;
+  }
+  /* 深色模式滚动条 */
+  .dark ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .dark ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 4px;
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
   }
   /* 数字等宽对齐金额、编号、尺寸 */
   .tabular,
