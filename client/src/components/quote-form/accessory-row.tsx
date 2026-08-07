@@ -18,8 +18,9 @@ export function AccessoryRow({ item, index, onUpdate, onRemove, nameEditable }: 
   const subtotal = item.quantity * item.unitPrice;
 
   return (
-    <div className="flex items-end gap-2">
-      <div className="flex-1 space-y-1.5">
+    <div className="flex flex-wrap items-end gap-2">
+      {/* 名称：PC flex-1，移动端占满整行 */}
+      <div className="min-w-0 flex-1 basis-full space-y-1.5 sm:basis-auto">
         {nameEditable ? (
           <>
             <label className="text-xs text-muted-foreground">名称</label>
@@ -38,7 +39,7 @@ export function AccessoryRow({ item, index, onUpdate, onRemove, nameEditable }: 
         value={item.quantity}
         onChange={(v) => onUpdate(index, { quantity: v })}
         step={1}
-        className="w-20"
+        className="w-20 shrink-0"
       />
       <NumberField
         label="单价"
@@ -46,7 +47,7 @@ export function AccessoryRow({ item, index, onUpdate, onRemove, nameEditable }: 
         onChange={(v) => onUpdate(index, { unitPrice: v })}
         step={0.01}
         suffix="元"
-        className="w-28"
+        className="w-24 shrink-0"
       />
       {/* 小计：数量×单价，只读 */}
       <div className="w-24 shrink-0 space-y-1.5">

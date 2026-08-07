@@ -207,15 +207,15 @@ export function OrderEditorPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <BackBar
           onBack={() => navigate('/orders')}
           title={mode === 'convert' ? '报价转订单' : mode === 'edit' ? '编辑订单' : '新建订单'}
           code="ORDER · 订单"
         />
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate('/orders')}>取消</Button>
-          <Button variant="accent" onClick={handleSave} disabled={saving}>
+          <Button variant="outline" className="shrink-0" onClick={() => navigate('/orders')}>取消</Button>
+          <Button variant="accent" className="shrink-0" onClick={handleSave} disabled={saving}>
             <Save className="h-4 w-4" />
             {saving ? '保存中…' : '保存'}
           </Button>
