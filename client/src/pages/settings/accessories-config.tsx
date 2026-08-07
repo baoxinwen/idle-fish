@@ -1,5 +1,7 @@
 /**
- * 默认配件配置表格：增删改。
+ * 默认配件配置：增删改。
+ * 移动端：名称占满一行，类别/数量/单价/删除第二行（与报价配件行布局统一）。
+ * PC：单行网格。
  */
 
 import { Plus, Trash2 } from 'lucide-react';
@@ -18,63 +20,66 @@ export function AccessoriesConfig() {
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between pb-3">
-        <CardTitle className="text-sm">默认配件配置</CardTitle>
+        <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">默认配件配置</CardTitle>
         <Button variant="ghost" size="sm" onClick={addAccessory}>
           <Plus className="h-3 w-3" />
           添加
         </Button>
       </CardHeader>
       <CardContent className="space-y-2">
-        <div className="overflow-x-auto">
-          <div className="min-w-[480px] space-y-2">
-            <div className="grid grid-cols-[minmax(0,1fr)_120px_80px_100px_36px] gap-2 px-1 text-xs text-muted-foreground">
-              <div>名称</div>
-              <div>类别</div>
-              <div className="text-right">默认数量</div>
-              <div className="text-right">默认单价</div>
-              <div />
+        {settings.defaultAccessories.map((a, i) => (
+          <div key={i} className="flex flex-wrap items-end gap-2">
+            {/* 名称：移动端占满整行，PC flex-1 */}
+            <div className="min-w-0 flex-1 basis-full space-y-1.5 sm:basis-auto">
+              <label className="text-xs text-muted-foreground sm:hidden">名称</label>
+              <Input
+                value={a.name}
+                onChange={(e) => updateAccessory(i, { name: e.target.value })}
+                className="h-8"
+              />
             </div>
-            {settings.defaultAccessories.map((a, i) => (
-              <div
-                key={i}
-                className="grid grid-cols-[minmax(0,1fr)_120px_80px_100px_36px] items-center gap-2"
+            {/* 类别 */}
+            <div className="w-24 shrink-0 space-y-1.5">
+              <label className="text-xs text-muted-foreground sm:hidden">类别</label>
+              <Select
+                value={a.category}
+                onChange={(e) => updateAccessory(i, { category: e.target.value as AccessoryCategory })}
+                className="h-8"
               >
-            <Input
-              value={a.name}
-              onChange={(e) => updateAccessory(i, { name: e.target.value })}
-              className="h-8"
-            />
-            <Select
-              value={a.category}
-              onChange={(e) => updateAccessory(i, { category: e.target.value as AccessoryCategory })}
-              className="h-8"
-            >
-              {Object.entries(CATEGORY_LABEL).map(([k, v]) => (
-                <option key={k} value={k}>
-                  {v}
-                </option>
-              ))}
-            </Select>
-            <input
-              type="number"
-              min={0}
-              step={1}
-              value={a.defaultQuantity}
-              onChange={(e) => updateAccessory(i, { defaultQuantity: Number(e.target.value) || 0 })}
-              className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular"
-            />
-            <input
-              type="number"
-              min={0}
-              step={0.01}
-              value={a.defaultUnitPrice}
-              onChange={(e) => updateAccessory(i, { defaultUnitPrice: Number(e.target.value) || 0 })}
-              className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular"
-            />
+                {Object.entries(CATEGORY_LABEL).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </Select>
+            </div>
+            {/* 数量 */}
+            <div className="w-16 shrink-0 space-y-1.5">
+              <label className="text-xs text-muted-foreground sm:hidden">数量</label>
+              <input
+                type="number"
+                min={0}
+                step={1}
+                value={a.defaultQuantity}
+                onChange={(e) => updateAccessory(i, { defaultQuantity: Number(e.target.value) || 0 })}
+                className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular"
+              />
+            </div>
+            {/* 单价 */}
+            <div className="w-20 shrink-0 space-y-1.5">
+              <label className="text-xs text-muted-foreground sm:hidden">单价</label>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                value={a.defaultUnitPrice}
+                onChange={(e) => updateAccessory(i, { defaultUnitPrice: Number(e.target.value) || 0 })}
+                className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular"
+              />
+            </div>
+            {/* 删除 */}
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+              className="mb-5 h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
               onClick={() => removeAccessory(i)}
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -86,8 +91,6 @@ export function AccessoriesConfig() {
             暂无配件配置，点击「添加」
           </div>
         )}
-          </div>
-        </div>
       </CardContent>
     </Card>
   );
