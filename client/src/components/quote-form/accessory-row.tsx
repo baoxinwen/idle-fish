@@ -2,6 +2,7 @@ import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { NumberField } from '@/components/number-field';
+import { formatMoney } from '@/lib/utils';
 import type { AccessoryItem } from '@idlefish/shared';
 
 interface AccessoryRowProps {
@@ -14,6 +15,8 @@ interface AccessoryRowProps {
 }
 
 export function AccessoryRow({ item, index, onUpdate, onRemove, nameEditable }: AccessoryRowProps) {
+  const subtotal = item.quantity * item.unitPrice;
+
   return (
     <div className="flex items-end gap-2">
       <div className="flex-1 space-y-1.5">
@@ -45,11 +48,18 @@ export function AccessoryRow({ item, index, onUpdate, onRemove, nameEditable }: 
         suffix="元"
         className="w-28"
       />
+      {/* 小计：数量×单价，只读 */}
+      <div className="w-24 shrink-0 space-y-1.5">
+        <label className="text-xs text-muted-foreground">小计</label>
+        <div className="flex h-9 items-center justify-end rounded-md border bg-muted/50 px-3 text-sm font-medium tabular">
+          {formatMoney(subtotal)}
+        </div>
+      </div>
       <Button
         variant="ghost"
         size="icon"
         onClick={() => onRemove(index)}
-        className="mb-5 text-muted-foreground hover:text-destructive"
+        className="mb-5 shrink-0 text-muted-foreground hover:text-destructive"
         title="删除"
       >
         <Trash2 className="h-4 w-4" />
