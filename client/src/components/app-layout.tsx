@@ -40,7 +40,7 @@ export function AppLayout() {
             <span className="font-mono-display text-sm font-bold text-accent">铝</span>
           </div>
           <div className="leading-tight">
-            <div className="font-mono-display text-sm font-bold tracking-wide">闲置鱼</div>
+            <div className="font-mono-display text-sm font-bold tracking-wide">闲鱼</div>
             <div className="label-mono text-[10px] text-sidebar-foreground/50">机柜报价</div>
           </div>
           {/* 移动端关闭按钮 */}

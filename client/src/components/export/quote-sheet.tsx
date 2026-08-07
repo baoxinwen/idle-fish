@@ -252,7 +252,7 @@ export const QuoteSheet = forwardRef<HTMLDivElement, QuoteSheetProps>(({ quote }
       <div style={S.titleBlock}>
         <div style={S.titleRow}>
           <div style={S.brand}>
-            <div style={S.brandMark}>闲置鱼 · 机柜报价</div>
+            <div style={S.brandMark}>闲鱼 · 机柜报价</div>
             <div style={S.brandTitle}>铝型材机柜</div>
             <div style={S.brandSub}>QUOTATION · 报价单</div>
           </div>
@@ -375,7 +375,7 @@ export const QuoteSheet = forwardRef<HTMLDivElement, QuoteSheetProps>(({ quote }
         <div>
           <div style={S.finalLabel}>最终报价</div>
           <div style={S.finalSub}>
-            {freightIncluded ? '含运费' : '未含运费'} · {installIncluded ? '含安装费' : '未含安装费'} · 含税
+            {freightIncluded ? '含运费' : '未含运费'} · {installIncluded ? '含安装费' : '未含安装费'}
           </div>
         </div>
         <div style={S.finalValue}>{formatMoney(quote.result.finalPrice)}</div>

@@ -48,7 +48,7 @@ export function LoginPage() {
   }
 
   return (
-    <AuthShell title="闲置鱼" subtitle="机柜报价 · 登录" onSubmit={handleSubmit}>
+    <AuthShell title="闲鱼" subtitle="机柜报价 · 登录" onSubmit={handleSubmit}>
       <div className="space-y-1.5">
         <Label htmlFor="login-username">用户名</Label>
         <Input

@@ -103,7 +103,7 @@ export const ProductionSheet = forwardRef<HTMLDivElement, ProductionSheetProps>(
       {/* 图签栏（深底，区别于报价图） */}
       <div style={S.titleBlock}>
         <div style={S.brand}>
-          <div style={S.brandMark}>闲置鱼 · 制作单</div>
+          <div style={S.brandMark}>闲鱼 · 制作单</div>
           <div style={S.brandTitle}>生产制作单</div>
           <div style={S.brandSub}>铝型材机柜 · 加工用</div>
         </div>
@@ -234,7 +234,7 @@ export const ProductionSheet = forwardRef<HTMLDivElement, ProductionSheetProps>(
       </table>
 
       <div style={S.footer}>
-        <span>闲置鱼 · 制作单 · {quote.quoteNo}</span>
+        <span>闲鱼 · 制作单 · {quote.quoteNo}</span>
         <span>本制作单供生产加工使用</span>
       </div>
     </div>
