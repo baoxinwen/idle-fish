@@ -150,7 +150,7 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             {pieData.length === 0 ? (
-              <EmptyChart />
+              <EmptyChart text="暂无订单" />
             ) : (
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
@@ -300,6 +300,6 @@ export function DashboardPage() {
   );
 }
 
-function EmptyChart() {
-  return <EmptyState icon={BarChart3} text="暂无数据" className="h-[200px] py-0" />;
+function EmptyChart({ text = '暂无数据' }: { text?: string }) {
+  return <EmptyState icon={BarChart3} text={text} className="h-[200px] py-0" />;
 }

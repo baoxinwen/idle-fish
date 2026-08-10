@@ -12,6 +12,13 @@ import { calcQuote } from '@idlefish/shared';
 import { CATEGORY_LABEL } from '@/lib/status';
 import { buildCostText, buildMaterialsText, copyText } from '@/lib/clipboard';
 import { formatMoney, profitColor, cn } from '@/lib/utils';
+import { useSpringNumber } from '@/lib/use-spring-number';
+
+/** 金额 spring 过渡：数值变化时弹簧平滑，而非瞬变 */
+function SpringMoney({ value, className }: { value: number; className?: string }) {
+  const spring = useSpringNumber(value);
+  return <div className={className}>{formatMoney(spring)}</div>;
+}
 
 export function CostSummary() {
   const input = useQuoteStore((s) => s.input);
@@ -50,7 +57,6 @@ export function CostSummary() {
         {b.accessoryGroups.map((g) => (
           <Row key={g.category} label={`配件·${CATEGORY_LABEL[g.category]}`} value={formatMoney(g.subtotal)} sub={`${g.items.length} 项`} />
         ))}
-        <Row label={`托盘（${b.trayCount}个）`} value={formatMoney(b.trayCost)} />
         <Divider />
         <Row label="材料成本" value={formatMoney(b.materialCost)} bold />
         <Row label="安装费" value={b.installFee > 0 ? formatMoney(b.installFee) : '未计入'} muted={!b.installFee} />
@@ -65,7 +71,7 @@ export function CostSummary() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <div className="label-mono text-xs text-muted-foreground">最终报价</div>
-              <div className="tabular text-2xl font-bold text-accent sm:text-3xl">{formatMoney(result.finalPrice)}</div>
+              <SpringMoney value={result.finalPrice} className="tabular text-2xl font-bold text-accent sm:text-3xl" />
             </div>
             <div className="text-left sm:text-right">
               <div className="label-mono text-xs text-muted-foreground">预计利润</div>

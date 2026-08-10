@@ -4,7 +4,7 @@
 
 import type { DefaultAccessoryConfig, Settings } from './types.js';
 
-/** 默认配件分组（连接件 / 紧固件 / 盲板） */
+/** 默认配件分组（连接件 / 紧固件 / 盲板 / 托盘） */
 export const DEFAULT_ACCESSORIES: DefaultAccessoryConfig[] = [
   // 连接件
   { name: '三通连接件', category: 'connector', defaultQuantity: 8, defaultUnitPrice: 0 },
@@ -18,6 +18,8 @@ export const DEFAULT_ACCESSORIES: DefaultAccessoryConfig[] = [
   { name: '2U 盲板', category: 'blindplate', defaultQuantity: 0, defaultUnitPrice: 0 },
   { name: '3U 盲板', category: 'blindplate', defaultQuantity: 0, defaultUnitPrice: 0 },
   { name: '4U 盲板', category: 'blindplate', defaultQuantity: 0, defaultUnitPrice: 0 },
+  // 托盘（普通配件，可删）
+  { name: '托盘', category: 'tray', defaultQuantity: 1, defaultUnitPrice: 0 },
 ];
 
 /** 默认设置（首次启动写入数据库） */
@@ -25,6 +27,7 @@ export const DEFAULT_SETTINGS: Settings = {
   defaultSize: { width: 600, depth: 400, height: 800 },
   defaultColor: 'silver',
   defaultTrayCount: 1,
+  defaultTrayUnitPrice: 0,
   defaultPricing: {
     silverPrice: 12.53,
     blackPrice: 13.8,

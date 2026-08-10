@@ -44,5 +44,6 @@ export const CATEGORY_LABEL: Record<string, string> = {
   connector: '连接件',
   fastener: '紧固件',
   blindplate: '盲板',
+  tray: '托盘',
   custom: '自定义',
 };

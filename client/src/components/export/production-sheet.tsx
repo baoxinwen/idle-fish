@@ -204,22 +204,17 @@ export const ProductionSheet = forwardRef<HTMLDivElement, ProductionSheetProps>(
             <td style={{ ...S.td, ...S.tdRight }}>{formatMoney(quote.result.breakdown.profile.unitPrice)}</td>
             <td style={{ ...S.td, ...S.tdRight }}>{formatMoney(quote.result.breakdown.profile.cost)}</td>
           </tr>
-          {quote.input.accessories.map((a, i) => (
-            <tr key={i}>
-              <td style={{ ...S.td, ...S.tdCat }}>{CATEGORY_LABEL[a.category]}</td>
-              <td style={S.td}>{a.name}</td>
-              <td style={{ ...S.td, ...S.tdRight }}>{a.quantity}</td>
-              <td style={{ ...S.td, ...S.tdRight }}>{formatMoney(a.unitPrice)}</td>
-              <td style={{ ...S.td, ...S.tdRight }}>{formatMoney(a.quantity * a.unitPrice)}</td>
-            </tr>
-          ))}
-          <tr>
-            <td style={{ ...S.td, ...S.tdCat }}>托盘</td>
-            <td style={S.td}>托盘</td>
-            <td style={{ ...S.td, ...S.tdRight }}>{quote.input.trayCount}</td>
-            <td style={{ ...S.td, ...S.tdRight }}>{formatMoney(quote.input.trayUnitPrice)}</td>
-            <td style={{ ...S.td, ...S.tdRight }}>{formatMoney(quote.result.breakdown.trayCost)}</td>
-          </tr>
+          {quote.input.accessories
+            .filter((a) => a.quantity > 0)
+            .map((a, i) => (
+              <tr key={i}>
+                <td style={{ ...S.td, ...S.tdCat }}>{CATEGORY_LABEL[a.category]}</td>
+                <td style={S.td}>{a.name}</td>
+                <td style={{ ...S.td, ...S.tdRight }}>{a.quantity}</td>
+                <td style={{ ...S.td, ...S.tdRight }}>{formatMoney(a.unitPrice)}</td>
+                <td style={{ ...S.td, ...S.tdRight }}>{formatMoney(a.quantity * a.unitPrice)}</td>
+              </tr>
+            ))}
           <tr>
             <td style={S.td} colSpan={4}>
               <span style={{ fontFamily: MONO, fontSize: 10, color: C.muted, letterSpacing: 1 }}>

@@ -12,7 +12,7 @@ export const cabinetSizeSchema = z.object({
 
 export const accessoryItemSchema = z.object({
   name: z.string().min(1),
-  category: z.enum(['connector', 'fastener', 'blindplate', 'custom']),
+  category: z.enum(['connector', 'fastener', 'blindplate', 'tray', 'custom']),
   quantity: z.number().int().nonnegative(),
   unitPrice: z.number().nonnegative(),
 });
@@ -86,11 +86,13 @@ export const settingsSchema = z.object({
   defaultSize: cabinetSizeSchema,
   defaultColor: z.enum(['silver', 'black']),
   defaultTrayCount: z.number().int().nonnegative(),
+  /** 默认托盘单价（托盘作为配件的默认单价） */
+  defaultTrayUnitPrice: z.number().nonnegative().default(0),
   defaultPricing: pricingParamsSchema,
   defaultAccessories: z.array(
     z.object({
       name: z.string().min(1),
-      category: z.enum(['connector', 'fastener', 'blindplate', 'custom']),
+      category: z.enum(['connector', 'fastener', 'blindplate', 'tray', 'custom']),
       defaultQuantity: z.number().int().nonnegative(),
       defaultUnitPrice: z.number().nonnegative(),
     }),

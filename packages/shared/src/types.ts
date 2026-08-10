@@ -21,7 +21,7 @@ export type OrderStatus =
   | 'cancelled'; // 已取消
 
 /** 配件类别 */
-export type AccessoryCategory = 'connector' | 'fastener' | 'blindplate' | 'custom';
+export type AccessoryCategory = 'connector' | 'fastener' | 'blindplate' | 'tray' | 'custom';
 
 // ---------- 几何与尺寸 ----------
 
@@ -289,6 +289,8 @@ export interface Settings {
   defaultColor: ProfileColor;
   /** 默认托盘数量 */
   defaultTrayCount: number;
+  /** 默认托盘单价（托盘作为配件的默认单价） */
+  defaultTrayUnitPrice: number;
   /** 默认配件分组配置 */
   defaultAccessories: DefaultAccessoryConfig[];
 }

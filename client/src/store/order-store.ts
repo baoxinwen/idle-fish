@@ -85,24 +85,33 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
       initialized: true,
     }),
 
-  /** 从设置带出必选配件（默认数量 > 0 的连接件/紧固件） */
-  reset: (settings) =>
+  /** 从设置带出默认配件（与新建报价一致：全部默认配件含托盘） */
+  reset: (settings) => {
+    const materials: AccessoryItem[] = settings.defaultAccessories.map((a) => ({
+      name: a.name,
+      category: a.category as AccessoryItem['category'],
+      quantity: a.defaultQuantity,
+      unitPrice: a.defaultUnitPrice,
+    }));
+    // 托盘作为配件：旧设置无 tray 项时补一个
+    if (!materials.some((m) => m.category === 'tray')) {
+      materials.push({
+        name: '托盘',
+        category: 'tray',
+        quantity: settings.defaultTrayCount,
+        unitPrice: settings.defaultTrayUnitPrice ?? 0,
+      });
+    }
     set({
       form: {
         ...structuredClone(EMPTY_FORM),
         size: { ...settings.defaultSize },
-        materials: settings.defaultAccessories
-          .filter((a) => a.defaultQuantity > 0)
-          .map((a) => ({
-            name: a.name,
-            category: a.category as AccessoryItem['category'],
-            quantity: a.defaultQuantity,
-            unitPrice: a.defaultUnitPrice,
-          })),
+        materials,
       },
       editingId: null,
       initialized: true,
-    }),
+    });
+  },
 
   markLoading: () => set({ initialized: false }),
 

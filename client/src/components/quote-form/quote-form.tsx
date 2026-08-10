@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { NumberField } from '@/components/number-field';
-import { ProfitRateField } from '@/components/profit-rate-field';
+import { ParamRow } from '@/components/param-row';
 import { AccessoryRow } from './accessory-row';
 import { useQuoteStore } from '@/store/quote-store';
 import { cn } from '@/lib/utils';
@@ -16,14 +16,13 @@ import { COLOR_LABEL, CATEGORY_LABEL } from '@/lib/status';
 import { calcTraySuggestedPrice, type Settings } from '@idlefish/shared';
 import type { AccessoryCategory } from '@idlefish/shared';
 
-const CATEGORY_ORDER: AccessoryCategory[] = ['connector', 'fastener', 'blindplate', 'custom'];
+const CATEGORY_ORDER: AccessoryCategory[] = ['connector', 'fastener', 'blindplate', 'tray', 'custom'];
 
 export function QuoteForm({ settings }: { settings: Settings | null }) {
   const {
     input,
     setSize,
     setColor,
-    setTrayCount,
     setTrayUnitPrice,
     toggleInstall,
     toggleFreight,
@@ -79,20 +78,6 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
               </Button>
             ))}
           </div>
-          {/* 托盘 */}
-          <div className="grid grid-cols-2 gap-3">
-            <NumberField label="托盘数量" value={input.trayCount} onChange={(v) => setTrayCount(v)} step={1} />
-            <NumberField label="托盘单价" value={input.trayUnitPrice} onChange={(v) => setTrayUnitPrice(v)} step={0.01} suffix="元" />
-          </div>
-          <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-xs">
-            <span className="text-muted-foreground">
-              建议价：¥{suggestedPrice.toFixed(2)}（面积×A+B）
-            </span>
-            <Button variant="ghost" size="sm" onClick={() => setTrayUnitPrice(suggestedPrice)}>
-              <Wand2 className="h-3 w-3" />
-              填入
-            </Button>
-          </div>
           {/* 费用计入 */}
           <div className="space-y-2 border-t pt-3">
             <Label className="text-xs text-muted-foreground">费用计入</Label>
@@ -130,24 +115,31 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
           <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">配件清单</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {CATEGORY_ORDER.map((cat) => {
+          {/* PC 表头：与配件行列对齐 */}
+          <div className="hidden items-end gap-2 border-b border-border pb-1 text-xs text-muted-foreground sm:flex">
+            <div className="flex-1">名称</div>
+            <div className="w-20 text-right">数量</div>
+            <div className="w-24 text-right">单价</div>
+            <div className="w-24 text-right">小计</div>
+            <div className="w-8" />
+          </div>
+          {CATEGORY_ORDER.filter((c) => c !== 'custom').map((cat) => {
             const items = input.accessories
               .map((a, i) => ({ a, i }))
               .filter(({ a }) => a.category === cat);
-            if (items.length === 0 && cat !== 'custom') return null;
+            if (items.length === 0) return null;
             return (
               <div key={cat} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs text-muted-foreground">{CATEGORY_LABEL[cat]}</Label>
-                  {cat === 'custom' && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => addAccessory({ name: '自定义配件', category: 'custom', quantity: 1, unitPrice: 0 })}
-                    >
-                      <Plus className="h-3 w-3" />
-                      添加
-                    </Button>
+                  {cat === 'tray' && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      建议价：¥{suggestedPrice.toFixed(2)}
+                      <Button variant="ghost" size="sm" onClick={() => setTrayUnitPrice(suggestedPrice)}>
+                        <Wand2 className="h-3 w-3" />
+                        填入
+                      </Button>
+                    </div>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -158,10 +150,44 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
                       index={i}
                       onUpdate={updateAccessory}
                       onRemove={removeAccessory}
-                      nameEditable={cat === 'custom'}
+                      nameEditable={false}
                     />
                   ))}
-                  {cat === 'custom' && items.length === 0 && (
+                </div>
+              </div>
+            );
+          })}
+
+          {/* 自定义配件：最后 */}
+          {(() => {
+            const items = input.accessories
+              .map((a, i) => ({ a, i }))
+              .filter(({ a }) => a.category === 'custom');
+            return (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground">{CATEGORY_LABEL.custom}</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => addAccessory({ name: '自定义配件', category: 'custom', quantity: 1, unitPrice: 0 })}
+                  >
+                    <Plus className="h-3 w-3" />
+                    添加
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {items.map(({ a, i }) => (
+                    <AccessoryRow
+                      key={i}
+                      item={a}
+                      index={i}
+                      onUpdate={updateAccessory}
+                      onRemove={removeAccessory}
+                      nameEditable
+                    />
+                  ))}
+                  {items.length === 0 && (
                     <div className="rounded-md border border-dashed py-3 text-center text-xs text-muted-foreground">
                       点击「添加」增加自定义配件
                     </div>
@@ -169,7 +195,7 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
                 </div>
               </div>
             );
-          })}
+          })()}
         </CardContent>
       </Card>
 
@@ -193,17 +219,24 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
           )}
         </div>
         {showPricing && (
-          <CardContent className="space-y-4 pt-0">
-            <div className="grid grid-cols-2 gap-3">
-              <NumberField label="银色单价" value={input.pricing.silverPrice} onChange={(v) => setPricing({ silverPrice: v })} step={0.01} suffix="元/m" />
-              <NumberField label="黑色单价" value={input.pricing.blackPrice} onChange={(v) => setPricing({ blackPrice: v })} step={0.01} suffix="元/m" />
-              <NumberField label="损耗率" value={input.pricing.wastage} onChange={(v) => setPricing({ wastage: v })} step={0.01} emptyValue={1} />
-              <ProfitRateField value={input.pricing.profitRate} onChange={(v) => setPricing({ profitRate: v })} />
-              <NumberField label="切割处理费" value={input.pricing.cuttingFee} onChange={(v) => setPricing({ cuttingFee: v })} step={0.01} suffix="元" />
-              <NumberField label="安装费" value={input.pricing.installFee} onChange={(v) => setPricing({ installFee: v })} step={0.01} suffix="元" />
-              <NumberField label="运费" value={input.pricing.freight} onChange={(v) => setPricing({ freight: v })} step={0.01} suffix="元" />
-              <NumberField label="托盘系数 A" value={input.pricing.trayCoeffA} onChange={(v) => setPricing({ trayCoeffA: v })} step={0.01} />
-              <NumberField label="托盘系数 B" value={input.pricing.trayCoeffB} onChange={(v) => setPricing({ trayCoeffB: v })} step={0.01} />
+          <CardContent className="pt-0">
+            <div className="grid grid-cols-1 gap-x-8 lg:grid-cols-2">
+              <div>
+                <div className="label-mono mb-1 border-b border-border pb-1 text-[10px] text-muted-foreground/70">型材</div>
+                <ParamRow label="银色单价" unit="元/m" value={input.pricing.silverPrice} onChange={(v) => setPricing({ silverPrice: v })} />
+                <ParamRow label="黑色单价" unit="元/m" value={input.pricing.blackPrice} onChange={(v) => setPricing({ blackPrice: v })} />
+                <ParamRow label="损耗率" unit="%" value={input.pricing.wastage} onChange={(v) => setPricing({ wastage: v })} wastage />
+                <ParamRow label="毛利率" unit="%" value={input.pricing.profitRate} onChange={(v) => setPricing({ profitRate: v })} percent />
+              </div>
+              <div>
+                <div className="label-mono mb-1 border-b border-border pb-1 text-[10px] text-muted-foreground/70">费用</div>
+                <ParamRow label="切割处理费" unit="元" value={input.pricing.cuttingFee} onChange={(v) => setPricing({ cuttingFee: v })} />
+                <ParamRow label="安装费" unit="元" value={input.pricing.installFee} onChange={(v) => setPricing({ installFee: v })} />
+                <ParamRow label="运费" unit="元" value={input.pricing.freight} onChange={(v) => setPricing({ freight: v })} />
+                <div className="label-mono mb-1 mt-3 border-b border-border pb-1 text-[10px] text-muted-foreground/70">托盘</div>
+                <ParamRow label="托盘系数 A" unit="" value={input.pricing.trayCoeffA} onChange={(v) => setPricing({ trayCoeffA: v })} />
+                <ParamRow label="托盘系数 B" unit="" value={input.pricing.trayCoeffB} onChange={(v) => setPricing({ trayCoeffB: v })} />
+              </div>
             </div>
           </CardContent>
         )}

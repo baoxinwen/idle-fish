@@ -10,7 +10,6 @@
     "build": "pnpm --filter @idlefish/shared build && pnpm --filter @idlefish/client build && pnpm --filter @idlefish/server build",
     "start": "pnpm --filter @idlefish/server start",
     "test": "pnpm --filter @idlefish/shared test",
-    "lint": "eslint .",
     "format": "prettier --write ."
   },
   "devDependencies": {

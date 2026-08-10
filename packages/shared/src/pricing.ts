@@ -73,9 +73,9 @@ export function calcTraySuggestedPrice(
   return roundMoney(area * coeffA + coeffB);
 }
 
-/** 按类别分组汇总配件 */
+/** 按类别分组汇总配件（含托盘，显示为「配件·托盘」） */
 export function groupAccessories(accessories: AccessoryItem[]): AccessoryGroupCost[] {
-  const categories: AccessoryCategory[] = ['connector', 'fastener', 'blindplate', 'custom'];
+  const categories: AccessoryCategory[] = ['connector', 'fastener', 'blindplate', 'tray', 'custom'];
   return categories
     .map((category) => {
       const items = accessories.filter((a) => a.category === category);
@@ -96,19 +96,26 @@ export function calcAccessoryTotal(accessories: AccessoryItem[]): number {
  * 总成本   = 材料成本 + (安装费 if 勾选) + (运费 if 勾选)
  */
 export function calcCostBreakdown(input: QuoteInput): CostBreakdown {
-  const { size, color, trayCount, trayUnitPrice, installEnabled, freightEnabled, accessories, pricing } = input;
+  const { size, color, installEnabled, freightEnabled, accessories, pricing } = input;
 
   const unitPrice = getProfileUnitPrice(pricing, color);
   const profile = calcProfileCost(size, unitPrice, pricing.wastage);
 
+  // 托盘是配件项（category='tray'），统一在配件里计算，不再单独加 trayCost
   const accessoryGroups = groupAccessories(accessories);
-  const accessoryTotal = calcAccessoryTotal(accessories);
+  const hasTrayItem = accessories.some((a) => a.category === 'tray');
+  // 兼容旧数据：accessories 无 tray 项时用 input 字段补虚拟托盘计入配件总额
+  const legacyTrayCost = hasTrayItem ? 0 : roundMoney(input.trayCount * input.trayUnitPrice);
+  const accessoryTotal = roundMoney(calcAccessoryTotal(accessories) + legacyTrayCost);
 
+  const trayItem = accessories.find((a) => a.category === 'tray');
+  const trayCount = trayItem ? trayItem.quantity : input.trayCount;
+  const trayUnitPrice = trayItem ? trayItem.unitPrice : input.trayUnitPrice;
   const traySuggestedPrice = calcTraySuggestedPrice(size, pricing.trayCoeffA, pricing.trayCoeffB);
   const trayCost = roundMoney(trayCount * trayUnitPrice);
 
   const materialCost = roundMoney(
-    profile.cost + pricing.cuttingFee + accessoryTotal + trayCost,
+    profile.cost + pricing.cuttingFee + accessoryTotal,
   );
 
   const installFee = installEnabled ? pricing.installFee : 0;

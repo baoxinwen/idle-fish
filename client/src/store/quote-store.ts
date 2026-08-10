@@ -67,7 +67,7 @@ const DEFAULT_INPUT: QuoteInput = {
   pricing: { ...DEFAULT_SETTINGS.defaultPricing },
 };
 
-/** 从设置构建初始 QuoteInput（带默认配件展开） */
+/** 从设置构建初始 QuoteInput（带默认配件展开，托盘作为 tray 配件项） */
 function inputFromSettings(settings: Settings): QuoteInput {
   const accessories: AccessoryItem[] = settings.defaultAccessories.map((a) => ({
     name: a.name,
@@ -75,11 +75,21 @@ function inputFromSettings(settings: Settings): QuoteInput {
     quantity: a.defaultQuantity,
     unitPrice: a.defaultUnitPrice,
   }));
+  // 托盘作为配件：若默认配件里没有 tray 项，用 defaultTrayCount/UnitPrice 补一个
+  if (!accessories.some((a) => a.category === 'tray')) {
+    accessories.push({
+      name: '托盘',
+      category: 'tray',
+      quantity: settings.defaultTrayCount,
+      unitPrice: settings.defaultTrayUnitPrice ?? 0,
+    });
+  }
+  const trayItem = accessories.find((a) => a.category === 'tray')!;
   return {
     size: { ...settings.defaultSize },
     color: settings.defaultColor,
-    trayCount: settings.defaultTrayCount,
-    trayUnitPrice: 0,
+    trayCount: trayItem.quantity,
+    trayUnitPrice: trayItem.unitPrice,
     installEnabled: false,
     freightEnabled: false,
     accessories,
@@ -111,9 +121,23 @@ export const useQuoteStore = create<QuoteStoreState>((set) => ({
 
   setColor: (color) => set((s) => ({ input: { ...s.input, color } })),
 
-  setTrayCount: (trayCount) => set((s) => ({ input: { ...s.input, trayCount } })),
+  setTrayCount: (trayCount) =>
+    set((s) => ({
+      input: {
+        ...s.input,
+        trayCount,
+        accessories: s.input.accessories.map((a) => (a.category === 'tray' ? { ...a, quantity: trayCount } : a)),
+      },
+    })),
 
-  setTrayUnitPrice: (trayUnitPrice) => set((s) => ({ input: { ...s.input, trayUnitPrice } })),
+  setTrayUnitPrice: (trayUnitPrice) =>
+    set((s) => ({
+      input: {
+        ...s.input,
+        trayUnitPrice,
+        accessories: s.input.accessories.map((a) => (a.category === 'tray' ? { ...a, unitPrice: trayUnitPrice } : a)),
+      },
+    })),
 
   toggleInstall: (installEnabled) => set((s) => ({ input: { ...s.input, installEnabled } })),
 

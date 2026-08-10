@@ -12,18 +12,22 @@ interface ProfitRateFieldProps {
   /** 小数形式的毛利率（0.2 = 20%） */
   value: number;
   onChange: (decimal: number) => void;
+  className?: string;
+  /** 内部输入框后缀，默认 %；表格行内传 "" 由外部单位列显示 */
+  suffix?: string;
 }
 
-export function ProfitRateField({ label = '毛利率', value, onChange }: ProfitRateFieldProps) {
+export function ProfitRateField({ label, value, onChange, className, suffix = '%' }: ProfitRateFieldProps) {
   const pct = Math.round(value * 1000) / 10; // 小数 → 百分制，保留 1 位
   return (
     <NumberField
       label={label}
+      className={className}
       value={pct}
       min={0}
       max={99.9}
       step={0.1}
-      suffix="%"
+      suffix={suffix}
       emptyValue={0}
       onChange={(v) => {
         // 钳制 0~99.9，再转回小数（÷100），最后再钳到 0.999 防浮点越界（99.9→0.9990000000000001 > zod max 0.999）

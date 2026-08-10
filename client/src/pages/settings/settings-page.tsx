@@ -7,7 +7,7 @@ import { Save, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { NumberField } from '@/components/number-field';
-import { ProfitRateField } from '@/components/profit-rate-field';
+import { ParamRow } from '@/components/param-row';
 import { Select } from '@/components/ui/select';
 import { useSettingsStore } from '@/store/settings-store';
 import { useToast } from '@/components/toaster';
@@ -26,7 +26,6 @@ export function SettingsPage() {
     load,
     setDefaultSize,
     setDefaultColor,
-    setDefaultTrayCount,
     setPricing,
     save,
   } = useSettingsStore();
@@ -96,13 +95,13 @@ export function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* 默认颜色与托盘 */}
+        {/* 默认颜色 */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">默认颜色与托盘</CardTitle>
+            <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">默认颜色</CardTitle>
             <CardDescription>新建报价时的初始值</CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-2 gap-3">
+          <CardContent>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">默认颜色</label>
               <Select value={settings.defaultColor} onChange={(e) => setDefaultColor(e.target.value as 'silver' | 'black')}>
@@ -111,7 +110,6 @@ export function SettingsPage() {
                 ))}
               </Select>
             </div>
-            <NumberField label="默认托盘数" value={settings.defaultTrayCount} onChange={(v) => setDefaultTrayCount(v)} step={1} />
           </CardContent>
         </Card>
 
@@ -121,32 +119,26 @@ export function SettingsPage() {
             <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">默认计价参数</CardTitle>
             <CardDescription>单次报价可在报价页覆盖这些值</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {/* 型材相关 */}
-            <div>
-              <div className="label-mono mb-2 text-[10px] text-muted-foreground/70">型材</div>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                <NumberField label="银色型材单价" value={p.silverPrice} onChange={(v) => setPricing({ silverPrice: v })} step={0.01} suffix="元/m" />
-                <NumberField label="黑色型材单价" value={p.blackPrice} onChange={(v) => setPricing({ blackPrice: v })} step={0.01} suffix="元/m" />
-                <NumberField label="损耗率" value={p.wastage} onChange={(v) => setPricing({ wastage: v })} step={0.01} emptyValue={1} />
-                <ProfitRateField label="默认毛利率" value={p.profitRate} onChange={(v) => setPricing({ profitRate: v })} />
+          <CardContent>
+            {/* 表格形式：标签固定宽 + 输入框等宽对齐 + 单位固定宽 */}
+            <div className="grid grid-cols-1 gap-x-10 lg:grid-cols-2">
+              {/* 型材 */}
+              <div>
+                <div className="label-mono mb-1 border-b border-border pb-1 text-[10px] text-muted-foreground/70">型材</div>
+                <ParamRow label="银色型材单价" unit="元/m" value={p.silverPrice} onChange={(v) => setPricing({ silverPrice: v })} />
+                <ParamRow label="黑色型材单价" unit="元/m" value={p.blackPrice} onChange={(v) => setPricing({ blackPrice: v })} />
+                <ParamRow label="损耗率" unit="%" value={p.wastage} onChange={(v) => setPricing({ wastage: v })} wastage />
+                <ParamRow label="默认毛利率" unit="%" value={p.profitRate} onChange={(v) => setPricing({ profitRate: v })} percent />
               </div>
-            </div>
-            {/* 费用相关 */}
-            <div>
-              <div className="label-mono mb-2 text-[10px] text-muted-foreground/70">费用</div>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                <NumberField label="切割处理费" value={p.cuttingFee} onChange={(v) => setPricing({ cuttingFee: v })} step={0.01} suffix="元" />
-                <NumberField label="安装费" value={p.installFee} onChange={(v) => setPricing({ installFee: v })} step={0.01} suffix="元" />
-                <NumberField label="运费" value={p.freight} onChange={(v) => setPricing({ freight: v })} step={0.01} suffix="元" />
-              </div>
-            </div>
-            {/* 托盘系数 */}
-            <div>
-              <div className="label-mono mb-2 text-[10px] text-muted-foreground/70">托盘</div>
-              <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                <NumberField label="托盘系数 A" value={p.trayCoeffA} onChange={(v) => setPricing({ trayCoeffA: v })} step={0.01} />
-                <NumberField label="托盘系数 B" value={p.trayCoeffB} onChange={(v) => setPricing({ trayCoeffB: v })} step={0.01} />
+              {/* 费用 + 托盘 */}
+              <div>
+                <div className="label-mono mb-1 border-b border-border pb-1 text-[10px] text-muted-foreground/70">费用</div>
+                <ParamRow label="切割处理费" unit="元" value={p.cuttingFee} onChange={(v) => setPricing({ cuttingFee: v })} />
+                <ParamRow label="安装费" unit="元" value={p.installFee} onChange={(v) => setPricing({ installFee: v })} />
+                <ParamRow label="运费" unit="元" value={p.freight} onChange={(v) => setPricing({ freight: v })} />
+                <div className="label-mono mb-1 mt-3 border-b border-border pb-1 text-[10px] text-muted-foreground/70">托盘</div>
+                <ParamRow label="托盘系数 A" unit="" value={p.trayCoeffA} onChange={(v) => setPricing({ trayCoeffA: v })} />
+                <ParamRow label="托盘系数 B" unit="" value={p.trayCoeffB} onChange={(v) => setPricing({ trayCoeffB: v })} />
               </div>
             </div>
           </CardContent>

@@ -22,7 +22,7 @@ import { Modal } from '@/components/ui/modal';
 import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
 import { ordersApi, quotesApi, settingsApi } from '@/lib/api';
 import { formatMoney } from '@/lib/utils';
-import { calcOrderFinance } from '@idlefish/shared';
+import { calcOrderFinance, roundMoney } from '@idlefish/shared';
 import type { AccessoryItem, CabinetSize, QuoteRecord } from '@idlefish/shared';
 
 type Mode = 'create' | 'convert' | 'edit';
@@ -153,13 +153,13 @@ export function OrderEditorPage() {
         clearDirty();
         toast('已保存修改');
       } else {
-        // 手动新建
+        // 手动新建：材料成本按材料清单实时计算值提交
         const res = await ordersApi.create({
           customer: form.customer,
           shippingAddress: form.shippingAddress,
           size: form.size,
           materials: form.materials,
-          materialCost: form.materialCost,
+          materialCost,
           otherFee: form.otherFee,
           actualPrice: form.actualPrice,
           remark: form.remark,
@@ -200,14 +200,21 @@ export function OrderEditorPage() {
   const shippingAddress = mode === 'convert' ? convertForm.shippingAddress : form.shippingAddress;
   const size: CabinetSize = mode === 'convert' ? quote!.input.size : form.size;
   const materials: AccessoryItem[] = mode === 'convert' ? quote!.input.accessories : form.materials;
-  const materialCost = mode === 'convert' ? quote!.result.breakdown.materialCost : form.materialCost;
+  // 材料成本：新建模式按材料清单实时计算（Σ 数量×单价）；转单用报价；编辑用手填/已存值
+  const materialCost =
+    mode === 'convert'
+      ? quote!.result.breakdown.materialCost
+      : mode === 'create'
+        ? roundMoney(materials.reduce((sum, m) => sum + m.quantity * m.unitPrice, 0))
+        : form.materialCost;
   const otherFee = mode === 'convert' ? quote!.result.breakdown.installFee : form.otherFee;
   const actualPrice = mode === 'convert' ? quote!.result.finalPrice : form.actualPrice;
   const remark = mode === 'convert' ? convertForm.remark : form.remark;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {/* 操作栏 sticky：长表单时保存始终可达 */}
+      <div className="sticky top-0 z-20 -mx-3 flex flex-col gap-3 border-b bg-background/80 px-3 py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between lg:-mx-6 lg:px-6">
         <BackBar
           onBack={() => navigate('/orders')}
           title={mode === 'convert' ? '报价转订单' : mode === 'edit' ? '编辑订单' : '新建订单'}
@@ -356,8 +363,8 @@ export function OrderEditorPage() {
           </Card>
         </div>
 
-        {/* 右：财务 */}
-        <div className="space-y-4">
+        {/* 右：财务，PC sticky 滚动表单时固定可见 */}
+        <div className="space-y-4 lg:sticky lg:top-16 lg:self-start">
           <Card>
             <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">财务数据</CardTitle></CardHeader>
             <CardContent className="space-y-4">
@@ -367,6 +374,26 @@ export function OrderEditorPage() {
                     <ReadOnlyField label="材料成本" value={formatMoney(materialCost)} />
                     <ReadOnlyField label="其他费用" value={formatMoney(otherFee)} />
                     <ReadOnlyField label="实际售价" value={formatMoney(actualPrice)} className="col-span-2" />
+                  </>
+                ) : mode === 'create' ? (
+                  <>
+                    {/* 新建：材料成本按材料清单实时计算，只读 */}
+                    <ReadOnlyField label="材料成本（按清单计算）" value={formatMoney(materialCost)} />
+                    <NumberField
+                      label="其他费用"
+                      value={otherFee}
+                      onChange={(v) => setOtherFee(v)}
+                      step={0.01}
+                      suffix="元"
+                    />
+                    <NumberField
+                      label="实际售价"
+                      value={actualPrice}
+                      onChange={(v) => setActualPrice(v)}
+                      step={0.01}
+                      suffix="元"
+                      className="col-span-2"
+                    />
                   </>
                 ) : (
                   <>

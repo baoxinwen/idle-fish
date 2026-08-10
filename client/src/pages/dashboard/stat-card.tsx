@@ -16,7 +16,7 @@ interface StatCardProps {
 
 export function StatCard({ label, value, hint, icon: Icon, accent = 'default' }: StatCardProps) {
   return (
-    <Card className="relative overflow-hidden p-4 transition-shadow hover:shadow-[0_4px_12px_rgba(11,18,32,0.06),0_2px_4px_rgba(11,18,32,0.04)]">
+    <Card className="card-hover relative overflow-hidden p-4">
       {/* 左侧强调竖条 */}
       <span
         className={cn(

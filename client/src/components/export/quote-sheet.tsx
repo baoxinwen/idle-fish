@@ -240,7 +240,6 @@ export const QuoteSheet = forwardRef<HTMLDivElement, QuoteSheetProps>(({ quote }
   const accessoryItems = quote.input.accessories
     .filter((a) => a.quantity > 0)
     .map((a) => ({ name: a.name, qty: `${a.quantity} 个` }));
-  if (b.trayCount > 0) accessoryItems.push({ name: '托盘', qty: `${b.trayCount} 个` });
   const materialGroups: { group: string; items: { name: string; qty: string }[] }[] = [
     { group: '铝型材', items: [{ name: `${COLOR_LABEL[quote.input.color]}铝型材`, qty: `${b.profile.totalLength}m` }] },
     ...(accessoryItems.length > 0 ? [{ group: '配件', items: accessoryItems }] : []),
@@ -310,10 +309,6 @@ export const QuoteSheet = forwardRef<HTMLDivElement, QuoteSheetProps>(({ quote }
         </div>
       </div>
       <div style={S.summary}>
-        <div style={S.summaryCell}>
-          <div style={S.summaryLabel}>托盘</div>
-          <div style={S.summaryValue}>{quote.input.trayCount} 个</div>
-        </div>
         <div style={S.summaryCell}>
           <div style={S.summaryLabel}>运费</div>
           <div style={freightIncluded ? S.summaryValueGold : S.summaryValue}>

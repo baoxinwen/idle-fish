@@ -164,7 +164,8 @@ export function QuoteEditorPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {/* 操作栏 sticky：长表单时保存/转单始终可达 */}
+      <div className="sticky top-0 z-20 -mx-3 flex flex-col gap-3 border-b bg-background/80 px-3 py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between lg:-mx-6 lg:px-6">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate('/quotes')}>
             <ArrowLeft className="h-4 w-4" />
@@ -221,8 +222,8 @@ export function QuoteEditorPage() {
         {/* 左：表单 */}
         <QuoteForm settings={settings} />
 
-        {/* 右：3D + 成本明细 */}
-        <div className="space-y-4">
+        {/* 右：3D + 成本明细，PC sticky 滚动表单时固定可见 */}
+        <div className="space-y-4 lg:sticky lg:top-16 lg:self-start">
           {/* 3D 预览：工程蓝图风背景 + 顶部标签 + 右下尺寸参考 */}
           <div className="relative h-[260px] overflow-hidden rounded-lg border bg-[radial-gradient(circle_at_50%_40%,#1E3A5F_0%,#0B1220_100%)] p-2 lg:h-[340px]">
             {/* 细网格线（蓝图感） */}

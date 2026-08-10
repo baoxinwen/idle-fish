@@ -33,11 +33,6 @@ export function buildMaterialsText(input: QuoteInput): string {
       lines.push(`  ${a.name} × ${a.quantity}`);
     }
   }
-  // 托盘（数量>0 才列）
-  if (input.trayCount > 0) {
-    lines.push('');
-    lines.push(`托盘 × ${input.trayCount}`);
-  }
   return lines.join('\n');
 }
 
@@ -49,7 +44,6 @@ export function buildCostText(result: QuoteResult): string {
   lines.push(`铝型材：${b.profile.totalLength}m × ${formatMoney(b.profile.unitPrice)}/m × 损耗${b.profile.wastage} = ${formatMoney(b.profile.cost)}`);
   lines.push(`切割处理费：${formatMoney(b.cuttingFee)}`);
   lines.push(`配件小计：${formatMoney(b.accessoryTotal)}`);
-  lines.push(`托盘：${b.trayCount} × ${formatMoney(b.trayUnitPrice)} = ${formatMoney(b.trayCost)}`);
   lines.push(`材料成本：${formatMoney(b.materialCost)}`);
   if (b.installFee > 0) lines.push(`安装费：${formatMoney(b.installFee)}`);
   lines.push(`运费：${formatMoney(b.freight)}`);

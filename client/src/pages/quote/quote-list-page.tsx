@@ -120,10 +120,15 @@ export function QuoteListPage() {
                 {records.map((r) => (
                   <tr
                     key={r.id}
-                    className="cursor-pointer border-b last:border-0 hover:bg-secondary/50"
+                    className="group/row cursor-pointer border-b last:border-0 hover:bg-secondary/50"
                     onClick={() => navigate(`/quotes/${r.id}`)}
                   >
-                    <td className="px-4 py-3 font-mono-display text-[13px] font-semibold">{r.quoteNo}</td>
+                    <td className="px-4 py-3 font-mono-display text-[13px] font-semibold">
+                      <span className="inline-flex items-center gap-1">
+                        {r.quoteNo}
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover/row:opacity-100" />
+                      </span>
+                    </td>
                     <td className="px-4 py-3 font-mono-display text-muted-foreground">
                       {r.input.size.width}×{r.input.size.depth}×{r.input.size.height}
                     </td>
@@ -172,7 +177,7 @@ export function QuoteListPage() {
             {records.map((r) => (
               <Card
                 key={r.id}
-                className="cursor-pointer p-3 transition-colors hover:bg-secondary/30"
+                className="card-hover cursor-pointer p-3"
                 onClick={() => navigate(`/quotes/${r.id}`)}
               >
                 <div className="flex items-center justify-between">

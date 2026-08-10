@@ -22,6 +22,7 @@ interface SettingsStoreState {
   setDefaultSize: (field: keyof CabinetSize, value: number) => void;
   setDefaultColor: (color: ProfileColor) => void;
   setDefaultTrayCount: (count: number) => void;
+  setDefaultTrayUnitPrice: (price: number) => void;
   setPricing: (patch: Partial<PricingParams>) => void;
 
   addAccessory: () => void;
@@ -57,6 +58,9 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
 
   setDefaultTrayCount: (count) =>
     set((s) => (s.settings ? { settings: { ...s.settings, defaultTrayCount: count }, dirty: true } : {})),
+
+  setDefaultTrayUnitPrice: (price) =>
+    set((s) => (s.settings ? { settings: { ...s.settings, defaultTrayUnitPrice: price }, dirty: true } : {})),
 
   setPricing: (patch) =>
     set((s) =>

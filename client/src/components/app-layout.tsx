@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
-import { FileText, Package, BarChart3, Settings, LogOut, Menu, X } from 'lucide-react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { FileText, Package, BarChart3, Settings, LogOut, Menu, X, Search } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
+import { CommandPalette } from './command-palette';
 import { Button } from './ui/button';
 import { useAuthStore } from '@/store/auth-store';
 import { cn } from '@/lib/utils';
@@ -15,6 +16,7 @@ const navItems = [
 
 export function AppLayout() {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { pathname } = useLocation();
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -115,6 +117,17 @@ export function AppLayout() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* ⌘K 命令面板触发（PC） */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden gap-2 text-muted-foreground lg:flex"
+              onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+            >
+              <Search className="h-3.5 w-3.5" />
+              搜索
+              <kbd className="rounded border bg-muted px-1 text-[10px]">⌘K</kbd>
+            </Button>
             <ThemeToggle />
             <Button
               variant="ghost"
@@ -127,11 +140,14 @@ export function AppLayout() {
           </div>
         </header>
         <main className="flex-1 overflow-auto bg-background p-3 lg:p-6">
-          <div className="mx-auto max-w-[1600px]">
+          <div key={pathname} className="page-enter mx-auto max-w-[1600px]">
             <Outlet />
           </div>
         </main>
       </div>
+
+      {/* ⌘K 命令面板（PC 效率） */}
+      <CommandPalette />
     </div>
   );
 }

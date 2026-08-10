@@ -102,11 +102,11 @@ describe('groupAccessories', () => {
 });
 
 describe('calcCostBreakdown', () => {
-  it('材料成本 = 铝型材 + 切割费 + 配件 + 托盘', () => {
+  it('材料成本 = 铝型材 + 切割费 + 配件（含托盘）', () => {
     const b = calcCostBreakdown(baseInput);
-    // 铝型材 88.41 + 切割 30 + 配件 (16+30=46) + 托盘 85 = 249.41
+    // 铝型材 88.41 + 切割 30 + 配件 46 + 托盘 85（旧数据无 tray 项，走兼容计入配件总额）= 249.41
     assert.equal(b.profile.cost, 88.41);
-    assert.equal(b.accessoryTotal, 46);
+    assert.equal(b.accessoryTotal, 131); // 46 + 85 托盘
     assert.equal(b.trayCost, 85);
     assert.equal(b.materialCost, 249.41);
     // 未勾选安装费，总成本 = 材料成本 + 运费 50

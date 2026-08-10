@@ -4,7 +4,7 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 interface NumberFieldProps {
-  label: string;
+  label?: string;
   value: number;
   onChange: (value: number) => void;
   min?: number;
@@ -51,7 +51,7 @@ export function NumberField({
 
   return (
     <div className={cn('space-y-1.5', className)}>
-      <Label className="label-mono text-muted-foreground">{label}</Label>
+      {label && <Label className="label-mono text-muted-foreground">{label}</Label>}
       <div className="flex items-center gap-2">
         <Input
           type="number"

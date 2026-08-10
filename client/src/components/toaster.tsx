@@ -1,46 +1,30 @@
 /**
- * 轻量 toast：自管理，避免引入额外依赖。
+ * Toast 封装：底层用 sonner（Emil Kowalski），spring 动画 + 堆叠 + 滑动消除。
+ * useToast 保持原有 selector 签名，调用点零改动。
  */
 
-import { create } from 'zustand';
+import { toast as sonnerToast, Toaster as SonnerToaster } from 'sonner';
+import { useTheme } from 'next-themes';
 
-interface ToastItem {
-  id: number;
-  message: string;
-}
-
-interface ToastStore {
-  toasts: ToastItem[];
+interface ToastStoreLike {
   show: (message: string) => void;
-  dismiss: (id: number) => void;
 }
 
-let counter = 0;
+/** 兼容原 useToast((s) => s.show) 调用方式，返回 sonner toast */
+export function useToast<T>(selector?: (s: ToastStoreLike) => T): T {
+  const store: ToastStoreLike = { show: (message: string) => sonnerToast(message) };
+  return selector ? selector(store) : (store as unknown as T);
+}
 
-export const useToast = create<ToastStore>((set) => ({
-  toasts: [],
-  show: (message) => {
-    const id = ++counter;
-    set((s) => ({ toasts: [...s.toasts, { id, message }] }));
-    setTimeout(() => {
-      set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
-    }, 2000);
-  },
-  dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
-}));
-
+/** 全局 Toaster：跟随主题，移动端底部、PC 右上 */
 export function Toaster() {
-  const { toasts } = useToast();
+  const { resolvedTheme } = useTheme();
   return (
-    <div className="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2 space-y-2">
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className="rounded-md bg-foreground px-4 py-2 text-sm text-background shadow-lg"
-        >
-          {t.message}
-        </div>
-      ))}
-    </div>
+    <SonnerToaster
+      theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
+      position="top-center"
+      richColors
+      closeButton
+    />
   );
 }
