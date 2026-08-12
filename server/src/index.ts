@@ -26,7 +26,8 @@ const PORT = Number(process.env.PORT ?? 3000);
 const BIND_HOST = process.env.IDLEFISH_HOST ?? '0.0.0.0';
 
 const app = express();
-// 反代后让 express-rate-limit 见真实客户端 IP（生产 1 跳，dev 0 跳，可用环境变量覆盖）
+// 经 Cloudflare Tunnel / 反向代理后让 express-rate-limit 见真实客户端 IP
+//（隧道/反代 1 跳 → 1，dev 0 跳 → 0，可用 IDLEFISH_TRUST_PROXY 覆盖）
 app.set('trust proxy', Number(process.env.IDLEFISH_TRUST_PROXY ?? (process.env.NODE_ENV === 'production' ? 1 : 0)));
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
@@ -77,7 +78,9 @@ const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
     path: req.path,
     stack: err instanceof Error ? err.stack : undefined,
   });
-  res.status(500).json({ error: '服务器内部错误', detail: err instanceof Error ? err.message : String(err) });
+  // 不返回内部错误详情（err.message 可能含 SQL/路径等内部信息，公网不应对外泄漏），
+  // 完整 stack 已在上面的日志中记录，可据此排查。
+  res.status(500).json({ error: '服务器内部错误' });
 };
 app.use(errorHandler);
 

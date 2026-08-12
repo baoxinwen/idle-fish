@@ -63,9 +63,8 @@ docker logs idlefish   # 抄取 setup token
 
 ### 部署要点（公网）
 
-- 必须经 nginx/Caddy 反向代理对外（HTTPS 在代理层终结），前后端同域名
-- nginx 需覆盖 `X-Forwarded-For` 为真实客户端 IP（`proxy_set_header X-Forwarded-For $remote_addr;`，勿用 `$proxy_add_x_forwarded_for`）
-- `IDLEFISH_TRUST_PROXY` 与反代跳数匹配（单层反代=1）
+- 公网访问经反向代理或隧道（如 nginx/Caddy、Cloudflare Tunnel）终结 HTTPS，应用不自行处理证书
+- 代理需透传真实客户端 IP 的 `X-Forwarded-For`；`IDLEFISH_TRUST_PROXY` 与代理跳数匹配（单层=1，compose 已设），登录限流才能按真实 IP 生效
 
 ## 目录结构
 
