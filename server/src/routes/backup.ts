@@ -6,7 +6,7 @@
 
 import { Router } from 'express';
 import multer from 'multer';
-import { createReadStream, createWriteStream, existsSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync } from 'node:fs';
+import { copyFileSync, createReadStream, createWriteStream, existsSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { Database as DBType } from 'better-sqlite3';
@@ -134,28 +134,55 @@ backupRouter.post('/restore', upload.single('file'), async (req, res) => {
 
   let autoBackupPath: string | null = null;
   try {
-    // 3) 关闭当前连接
+    // 3) 先把当前库 WAL 合并进主文件（TRUNCATE），保证后续备份/替换拿到完整数据；
+    //    checkpoint 失败不阻断（极端情况备份略旧）
+    try {
+      getDb().pragma('wal_checkpoint(TRUNCATE)');
+    } catch {
+      // ignore
+    }
+
+    // 4) 关闭当前连接
     closeDb();
 
-    // 4) 自动备份当前库（若存在）
+    // 5) 自动备份当前库（若存在）：用 copy 而非 rename —— 原库保持在 dbPath 原位，
+    //    消除「closeDb 后、替换前」dbPath 缺失的崩溃窗口（崩溃时重启不会建出空库）
     if (existsSync(dbPath)) {
       const ts = Date.now();
       autoBackupPath = join(dir, `idlefish-before-restore-${ts}.db`);
-      renameSync(dbPath, autoBackupPath);
+      copyFileSync(dbPath, autoBackupPath);
     }
 
-    // 5) 把上传的临时文件挪到 dbPath
+    // 6) 用上传文件替换 dbPath：POSIX 上 renameSync 原子覆盖已存在目标；
+    //    Windows 目标存在会报错，回退到 unlink + rename，再回退到流式覆盖
     try {
       renameSync(req.file.path, dbPath);
     } catch {
-      await pipeline(createReadStream(req.file.path), createWriteStream(dbPath));
-      unlinkSync(req.file.path);
+      try {
+        unlinkSync(dbPath);
+        renameSync(req.file.path, dbPath);
+      } catch {
+        await pipeline(createReadStream(req.file.path), createWriteStream(dbPath));
+        unlinkSync(req.file.path);
+      }
     }
 
-    // 6) 重新打开（getDb 会幂等建表，恢复的库结构已校验通过）
+    // 7) 清理旧库残留的 -wal/-shm（属于旧库，不应被新库继承）
+    for (const suffix of ['-wal', '-shm']) {
+      const stale = dbPath + suffix;
+      if (existsSync(stale)) {
+        try {
+          unlinkSync(stale);
+        } catch {
+          // 忽略：清理失败不影响主流程
+        }
+      }
+    }
+
+    // 8) 重新打开（getDb 会幂等建表，恢复的库结构已校验通过）
     getDb();
 
-    // 7) 清理过期的恢复前自动备份，仅保留最近若干份
+    // 9) 清理过期的恢复前自动备份，仅保留最近若干份
     pruneAutoBackups(dir);
 
     res.json({
