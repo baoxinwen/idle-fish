@@ -67,7 +67,8 @@ function ChartTooltip({ active, payload, label }: TooltipProps<number, string>) 
           <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
           <span className="text-muted-foreground">{p.name}</span>
           <span className="ml-auto font-medium text-foreground">
-            {typeof p.value === 'number' && label?.includes('利润') ? formatMoney(p.value) : p.value}
+            {/* 只有「利润」序列格式化为金额；label 是 X 轴日期，不是系列名 */}
+            {typeof p.value === 'number' && p.name === '利润' ? formatMoney(p.value) : p.value}
           </span>
         </div>
       ))}
@@ -88,10 +89,19 @@ export function DashboardPage() {
   const toast = useToast((s) => s.show);
 
   useEffect(() => {
+    // 竞态保护：快速切换区间时，废弃慢请求的迟到结果，避免旧区间数据覆盖新区间
+    let cancelled = false;
     statsApi
       .get(range)
-      .then(setData)
-      .catch((e) => toast(`加载统计失败：${e}`));
+      .then((d) => {
+        if (!cancelled) setData(d);
+      })
+      .catch((e) => {
+        if (!cancelled) toast(`加载统计失败：${e}`);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [range]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!data) return <div className="text-sm text-muted-foreground">加载中…</div>;

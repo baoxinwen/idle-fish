@@ -58,9 +58,10 @@ export function QuoteEditorPage() {
   // 加载设置 + 编辑记录
   useEffect(() => {
     // 创建后导航到 /quotes/:id 时，store 已通过 loadFromRecord 持有该记录，
-    // editingId === id，此时跳过 markLoading/重载，避免短暂 LoadingState 闪屏
+    // editingId === id，此时跳过 markLoading/重载，避免短暂 LoadingState 闪屏。
+    // 注意：此分支不产生 input 变化，不可重设 justLoaded.current——
+    // 否则创建后第一次编辑会被误当作「刚加载」而吞掉 dirty 标记。
     if (id && editingId === id && initialized) {
-      justLoaded.current = true;
       return;
     }
     markLoading();

@@ -98,7 +98,9 @@ export function OrderEditorPage() {
         .then((r) => loadFromRecord(r))
         .catch((e) => toast(`加载订单失败：${e}`));
     } else {
-      // 手动新建：加载设置，带出必选配件
+      // 手动新建：markLoading 避免闪现上一个订单的陈旧数据（此前编辑过订单时 initialized=true）
+      markLoading();
+      // 加载设置，带出必选配件
       settingsApi
         .get()
         .then((s) => reset(s))
@@ -112,7 +114,12 @@ export function OrderEditorPage() {
       const b = quote.result.breakdown;
       return calcOrderFinance(b.materialCost, b.installFee, quote.result.finalPrice);
     }
-    return calcOrderFinance(form.materialCost, form.otherFee, form.actualPrice);
+    // 新建模式：材料成本按材料清单实时计算（Σ 数量×单价），随清单编辑联动；编辑用已存值
+    const mc =
+      mode === 'create'
+        ? roundMoney(form.materials.reduce((sum, m) => sum + m.quantity * m.unitPrice, 0))
+        : form.materialCost;
+    return calcOrderFinance(mc, form.otherFee, form.actualPrice);
   }, [mode, quote, form]);
 
   async function handleSave() {
