@@ -55,11 +55,13 @@ export function ensureSetupToken(): void {
     // 写入失败（如只读挂载）则仅内存持有，重启后失效——仍 fail-closed 安全
   }
   setupTokenCache = token;
-  // 仅首次生成时打到日志（stdout + app.log），供部署者抄取
-  log.info('auth', '首次 setup token 生成（用于 /setup 页创建管理员，请妥善保管，首启后可忽略）');
-  log.info('auth', '========================================');
-  log.info('auth', token);
-  log.info('auth', '========================================');
+  // 仅首次生成时输出到控制台（docker logs 可见），供部署者抄取。
+  // 刻意不用 log.info：winston 会写入轮转的 app-*.log 持久文件，token 不应落盘，
+  // 否则日志文件泄露即首启窗口可被抢注。
+  log.info('auth', '首次 setup token 已生成，见下方控制台输出（docker logs），请妥善保管，首启后可忽略');
+  console.log('[auth] ========================================');
+  console.log(`[auth] setup token: ${token}`);
+  console.log('[auth] ========================================');
 }
 
 /** 取当前 setup token（未初始化返回 null，调用方应先 ensureSetupToken） */
@@ -191,11 +193,6 @@ export function touchSession(sid: string, res?: Response): boolean {
 /** 销毁会话（登出/撤销） */
 export function destroySession(sid: string): void {
   getDb().prepare('DELETE FROM sessions WHERE id = ?').run(sid);
-}
-
-/** 销毁除指定 sid 外的全部会话（改密后踢出其他设备/可能已泄露的会话） */
-export function destroyOtherSessions(keepSid: string): void {
-  getDb().prepare('DELETE FROM sessions WHERE id != ?').run(keepSid);
 }
 
 /** 鉴权中间件：校验 cookie 中的 session id，无效则 401 */

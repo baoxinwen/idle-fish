@@ -13,7 +13,6 @@ import {
   COOKIE_NAME,
   cookieOptions,
   createSession,
-  destroyOtherSessions,
   destroySession,
   getUser,
   hashPassword,
@@ -133,13 +132,18 @@ authProtectedRouter.post('/password', authLimiter, async (req, res) => {
   if (!user) return res.status(409).json({ error: '尚未初始化' });
   if (!(await verifyPassword(oldPassword, user.password_hash))) {
     log.warn('auth', '改密失败（旧密码错误）', { user: user.username, ip: req.ip });
-    return res.status(401).json({ error: '旧密码错误' });
+    // 用 400（客户端输入错误）而非 401（会话失效）：
+    // 避免前端把「旧密码错误」误判为会话过期而强制跳登录
+    return res.status(400).json({ error: '旧密码错误' });
   }
   const newHash = await hashPassword(newPassword);
   getDb().prepare('UPDATE users SET password_hash = ? WHERE id = 1').run(newHash);
-  // 撤销除当前会话外的全部会话：踢出其他设备 / 可能已泄露的会话
+  // 会话轮换：销毁全部会话（含当前），再为新密码签发新会话，
+  // 被窃取的旧 cookie 副本在改密后立即失效（之前 destroyOtherSessions 保留当前会话）。
   const currentSid = req.cookies?.[COOKIE_NAME] as string | undefined;
-  if (currentSid) destroyOtherSessions(currentSid);
-  log.info('auth', '改密成功', { user: user.username, ip: req.ip });
+  if (currentSid) destroySession(currentSid);
+  const { sid } = createSession(user.id);
+  res.cookie(COOKIE_NAME, sid, cookieOptions());
+  log.info('auth', '改密成功，已轮换会话', { user: user.username, ip: req.ip });
   res.json({ ok: true });
 });
