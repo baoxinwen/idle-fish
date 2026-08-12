@@ -118,8 +118,8 @@ export async function exportQuoteExcel(quote: QuoteRecord): Promise<void> {
     ['成本项', '金额（元）'],
     ['铝型材', b.profile.cost],
     ['切割处理费', b.cuttingFee],
+    // 配件行已含托盘（accessoryTotal 含托盘，托盘是配件项），不再单独列，避免重复计费
     ['配件', b.accessoryTotal],
-    ['托盘', b.trayCost],
     ['材料成本', b.materialCost],
     ['安装费', b.installFee],
     ['运费', b.freight],

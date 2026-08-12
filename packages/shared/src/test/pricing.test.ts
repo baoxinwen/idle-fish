@@ -101,6 +101,42 @@ describe('groupAccessories', () => {
   });
 });
 
+describe('calcCostBreakdown（托盘作为配件项，新模型）', () => {
+  it('配件含托盘项时 accessoryTotal 计入托盘，且不重复计费', () => {
+    // legacy 字段给不一致的值，证明以配件行为准
+    const input: QuoteInput = {
+      ...baseInput,
+      trayCount: 999,
+      trayUnitPrice: 999,
+      accessories: [
+        ...baseInput.accessories,
+        { name: '托盘', category: 'tray', quantity: 1, unitPrice: 85 },
+      ],
+    };
+    const b = calcCostBreakdown(input);
+    // 配件：connector 16 + fastener 30 + 托盘 85 = 131
+    assert.equal(b.accessoryTotal, 131);
+    // trayCost 以配件行为准（1×85），忽略不一致的 legacy 字段
+    assert.equal(b.trayCost, 85);
+    // 材料成本 = 铝型材 88.41 + 切割 30 + 配件 131 = 249.41，托盘只算一次
+    assert.equal(b.materialCost, 249.41);
+  });
+
+  it('删除托盘配件项且 trayCount=0 时成本不含托盘', () => {
+    // 注：托盘「删除后不复活」的根治在前端 store（removeAccessory 同步清 trayCount），
+    // 引擎对「无托盘项 + legacy trayCount>0」无法区分旧数据与删除残留，只能按兼容路径处理。
+    const input: QuoteInput = {
+      ...baseInput,
+      trayCount: 0,
+      accessories: baseInput.accessories.filter((a) => a.category !== 'tray'),
+    };
+    const b = calcCostBreakdown(input);
+    assert.equal(b.accessoryTotal, 46); // 16 + 30
+    assert.equal(b.trayCost, 0);
+    assert.equal(b.materialCost, 164.41); // 88.41 + 30 + 46
+  });
+});
+
 describe('calcCostBreakdown', () => {
   it('材料成本 = 铝型材 + 切割费 + 配件（含托盘）', () => {
     const b = calcCostBreakdown(baseInput);

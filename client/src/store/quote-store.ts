@@ -104,9 +104,30 @@ export const useQuoteStore = create<QuoteStoreState>((set) => ({
   initialized: false,
 
   loadFromRecord: (input, id, status) => {
-    // 旧记录（freightEnabled 字段引入前）无此字段，兜底为 true 保持原行为（运费总是计入）
+    // 归一化：
+    //  - 旧记录（freightEnabled 字段引入前）无此字段，兜底为 true 保持原行为（运费总是计入）
+    //  - trayCount/trayUnitPrice 与托盘配件项镜像同步：有托盘项则从项取值；
+    //    无托盘项但 trayCount>0（托盘配件化前的旧数据）则补一个托盘配件项，
+    //    避免引擎走 legacyTrayCost 兼容分支（删除托盘后成本复活的问题）
+    const base = structuredClone(input);
+    const trayItem = base.accessories.find((a) => a.category === 'tray');
+    let accessories = base.accessories;
+    let trayCount = base.trayCount ?? 0;
+    let trayUnitPrice = base.trayUnitPrice ?? 0;
+    if (trayItem) {
+      trayCount = trayItem.quantity;
+      trayUnitPrice = trayItem.unitPrice;
+    } else if (trayCount > 0) {
+      accessories = [
+        ...accessories,
+        { name: '托盘', category: 'tray' as const, quantity: trayCount, unitPrice: trayUnitPrice },
+      ];
+    }
     const normalized: QuoteInput = {
-      ...structuredClone(input),
+      ...base,
+      accessories,
+      trayCount,
+      trayUnitPrice,
       freightEnabled: input.freightEnabled ?? true,
     };
     set({ input: normalized, editingId: id, editingStatus: status, initialized: true });
@@ -146,16 +167,33 @@ export const useQuoteStore = create<QuoteStoreState>((set) => ({
   updateAccessory: (index, patch) =>
     set((s) => {
       const accessories = s.input.accessories.map((a, i) => (i === index ? { ...a, ...patch } : a));
-      return { input: { ...s.input, accessories } };
+      // 托盘配件行的数量/单价变化同步到 legacy 字段，保持镜像一致
+      const updated = accessories[index];
+      const trayPatch =
+        updated?.category === 'tray'
+          ? { trayCount: updated.quantity, trayUnitPrice: updated.unitPrice }
+          : {};
+      return { input: { ...s.input, ...trayPatch, accessories } };
     }),
 
   addAccessory: (item) =>
-    set((s) => ({ input: { ...s.input, accessories: [...s.input.accessories, item] } })),
+    set((s) => {
+      // 新增托盘配件项时同步 legacy 字段
+      const trayPatch =
+        item.category === 'tray'
+          ? { trayCount: item.quantity, trayUnitPrice: item.unitPrice }
+          : {};
+      return { input: { ...s.input, ...trayPatch, accessories: [...s.input.accessories, item] } };
+    }),
 
   removeAccessory: (index) =>
-    set((s) => ({
-      input: { ...s.input, accessories: s.input.accessories.filter((_, i) => i !== index) },
-    })),
+    set((s) => {
+      const removed = s.input.accessories[index];
+      const accessories = s.input.accessories.filter((_, i) => i !== index);
+      // 删除托盘配件项时同步 trayCount=0，避免引擎 legacyTrayCost 让删掉的托盘成本复活
+      const trayPatch = removed?.category === 'tray' ? { trayCount: 0 } : {};
+      return { input: { ...s.input, ...trayPatch, accessories } };
+    }),
 
   setPricing: (patch) =>
     set((s) => ({ input: { ...s.input, pricing: { ...s.input.pricing, ...patch } } })),
