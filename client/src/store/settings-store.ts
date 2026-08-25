@@ -10,6 +10,7 @@ import {
   type ProfileColor,
   type Settings,
 } from '@idlefish/shared';
+import { settingsApi } from '@/lib/api';
 
 interface SettingsStoreState {
   settings: Settings | null;
@@ -31,8 +32,6 @@ interface SettingsStoreState {
 
   save: () => Promise<void>;
 }
-
-import { settingsApi } from '@/lib/api';
 
 export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
   settings: null,

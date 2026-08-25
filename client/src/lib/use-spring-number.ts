@@ -21,6 +21,15 @@ export function useSpringNumber(target: number): number {
     const from = current.current;
     if (from === target) return;
 
+    // L9：目标为 Infinity/NaN（如输入 "1e999" 触发 M10 之前的一帧）时弹簧永不收敛，
+    // rAF 会 60fps 空转且渲染 ¥NaN——非有限目标直接跳变并退出动画。
+    if (!Number.isFinite(target)) {
+      current.current = target;
+      velocity.current = 0;
+      setValue(target);
+      return;
+    }
+
     let last = performance.now();
     const step = (now: number) => {
       const dt = Math.min((now - last) / 1000, 0.064); // 限步长防抖

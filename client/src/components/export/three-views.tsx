@@ -10,7 +10,7 @@ import { C } from './sheet-theme';
 
 interface ThreeViewsProps {
   size: CabinetSize;
-  /** 外径标注（true，默认）或内径标注（false，生产单用） */
+  /** 内径标注（true，生产单裁切用）或外径标注（false，默认）——F-14：原注释写反了 */
   showInner?: boolean;
   width?: number;
 }
@@ -176,7 +176,7 @@ function DimLine({
         y={my - (vertical ? 6 : 7)}
         width={vertical ? 36 : 44}
         height={12}
-        fill="#F5F2EC"
+        fill={C.paper}
       />
       <text
         x={mx}

@@ -23,13 +23,10 @@ export function formatDateTime(iso: string): string {
   return `${date} ${time}`;
 }
 
-/** 利润正负配色类：正=绿，负=红。统一三处（cost-summary/order-detail/stat-card）口径 */
+/** 利润正负配色类：正=绿，负=红。统一利润数值配色口径（第八轮 F-08：内联三元已全部收口至此） */
 export function profitColor(value: number): string {
   return value >= 0
     ? 'text-emerald-600 dark:text-emerald-400'
     : 'text-destructive';
 }
-
-/** 金额强调色（最终报价/总利润等主值）：暖金 */
-export const moneyAccent = 'text-accent';
 

@@ -12,6 +12,8 @@ import { Select } from '@/components/ui/select';
 import { useSettingsStore } from '@/store/settings-store';
 import { CATEGORY_LABEL } from '@/lib/status';
 import type { AccessoryCategory } from '@idlefish/shared';
+// F-03：输入收敛统一走 lib/input-sanitize（此前与 accessory-row 各持一份拷贝）
+import { toCount, toPrice } from '@/lib/input-sanitize';
 
 export function AccessoriesConfig() {
   const { settings, addAccessory, updateAccessory, removeAccessory } = useSettingsStore();
@@ -75,7 +77,7 @@ export function AccessoriesConfig() {
                         min={0}
                         step={1}
                         value={a.defaultQuantity}
-                        onChange={(e) => updateAccessory(i, { defaultQuantity: Number(e.target.value) || 0 })}
+                        onChange={(e) => updateAccessory(i, { defaultQuantity: toCount(e.target.value) })}
                         className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular"
                       />
                     </div>
@@ -87,7 +89,7 @@ export function AccessoriesConfig() {
                         min={0}
                         step={0.01}
                         value={a.defaultUnitPrice}
-                        onChange={(e) => updateAccessory(i, { defaultUnitPrice: Number(e.target.value) || 0 })}
+                        onChange={(e) => updateAccessory(i, { defaultUnitPrice: toPrice(e.target.value) })}
                         className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular"
                       />
                     </div>

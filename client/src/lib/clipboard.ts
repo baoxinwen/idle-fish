@@ -2,7 +2,7 @@
  * 报价文本生成（复制到剪贴板用）。
  */
 
-import type { QuoteResult } from '@idlefish/shared';
+import type { AccessoryCategory, QuoteResult } from '@idlefish/shared';
 import { calcProfileCost, getProfileUnitPrice } from '@idlefish/shared';
 import { CATEGORY_LABEL, COLOR_LABEL } from './status';
 import type { QuoteInput } from '@idlefish/shared';
@@ -19,8 +19,8 @@ export function buildMaterialsText(input: QuoteInput): string {
   const profileLen = calcProfileCost(input.size, unitPrice, input.pricing.wastage).totalLength;
   lines.push(`铝型材 × ${profileLen}m`);
   lines.push('');
-  // 配件按类别分组，过滤数量 0
-  const byCat = new Map<string, typeof input.accessories>();
+  // 配件按类别分组，过滤数量 0（键用 shared 枚举类型，F-09 收紧后可直接索引 CATEGORY_LABEL）
+  const byCat = new Map<AccessoryCategory, typeof input.accessories>();
   for (const a of input.accessories) {
     if (a.quantity <= 0) continue;
     const arr = byCat.get(a.category) ?? [];

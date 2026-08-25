@@ -34,7 +34,7 @@ export function SettingsPage() {
 
   useEffect(() => {
     load().catch((e) => toast(`加载失败：${e}`));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // 依赖刻意为空：仅首次挂载加载一次
 
   async function handleSave() {
     setSaving(true);
@@ -50,8 +50,13 @@ export function SettingsPage() {
 
   async function handleReload() {
     if (dirty && !(await confirmDialog({ message: '有未保存修改，确认放弃并重新加载？', confirmLabel: '放弃修改' }))) return;
-    await load();
-    toast('已重新加载');
+    // F-05：此前裸 await load()——失败时无提示、控制台 unhandledrejection
+    try {
+      await load();
+      toast('已重新加载');
+    } catch (e) {
+      toast(`加载失败：${e}`);
+    }
   }
 
   if (!loaded || !settings) return <LoadingState />;
@@ -137,8 +142,8 @@ export function SettingsPage() {
                 <ParamRow label="安装费" unit="元" value={p.installFee} onChange={(v) => setPricing({ installFee: v })} />
                 <ParamRow label="运费" unit="元" value={p.freight} onChange={(v) => setPricing({ freight: v })} />
                 <div className="label-mono mb-1 mt-3 border-b border-border pb-1 text-[10px] text-muted-foreground/70">托盘</div>
-                <ParamRow label="托盘系数 A" unit="" value={p.trayCoeffA} onChange={(v) => setPricing({ trayCoeffA: v })} />
-                <ParamRow label="托盘系数 B" unit="" value={p.trayCoeffB} onChange={(v) => setPricing({ trayCoeffB: v })} />
+                <ParamRow label="托盘系数 A" unit="" value={p.trayCoeffA} onChange={(v) => setPricing({ trayCoeffA: v })} unclamped />
+                <ParamRow label="托盘系数 B" unit="" value={p.trayCoeffB} onChange={(v) => setPricing({ trayCoeffB: v })} unclamped />
               </div>
             </div>
           </CardContent>

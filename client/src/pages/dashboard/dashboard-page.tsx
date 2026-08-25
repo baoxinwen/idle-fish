@@ -7,10 +7,9 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { EmptyState } from '@/components/states';
+import { EmptyState, LoadingState } from '@/components/states';
 import { StatCard } from './stat-card';
 import { statsApi } from '@/lib/api';
-import { useToast } from '@/components/toaster';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_BADGE, QUOTE_STATUS_LABEL } from '@/lib/status';
 import { formatMoney } from '@/lib/utils';
 import type { StatsData, StatsRange } from '@idlefish/shared';
@@ -29,7 +28,7 @@ import {
   Bar,
 } from 'recharts';
 import type { TooltipProps } from 'recharts';
-import { FileText, Package, DollarSign, Target, BarChart3 } from 'lucide-react';
+import { FileText, Package, DollarSign, Target, BarChart3, AlertTriangle } from 'lucide-react';
 const RANGES: { key: StatsRange; label: string }[] = [
   { key: '7d', label: '近 7 天' },
   { key: '30d', label: '近 30 天' },
@@ -86,25 +85,39 @@ function formatDate(date: string, range: StatsRange): string {
 export function DashboardPage() {
   const [data, setData] = useState<StatsData | null>(null);
   const [range, setRange] = useState<StatsRange>('30d');
-  const toast = useToast((s) => s.show);
+  // F-06：错误态 + 手动重试（此前失败后永久停留「加载中…」且无重试路径）
+  const [error, setError] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
 
   useEffect(() => {
     // 竞态保护：快速切换区间时，废弃慢请求的迟到结果，避免旧区间数据覆盖新区间
     let cancelled = false;
+    setError(null);
     statsApi
       .get(range)
       .then((d) => {
         if (!cancelled) setData(d);
       })
       .catch((e) => {
-        if (!cancelled) toast(`加载统计失败：${e}`);
+        if (!cancelled) setError(String(e));
       });
     return () => {
       cancelled = true;
     };
-  }, [range]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [range, reloadNonce]);
 
-  if (!data) return <div className="text-sm text-muted-foreground">加载中…</div>;
+  if (error) {
+    return (
+      <EmptyState
+        icon={AlertTriangle}
+        text="统计加载失败"
+        hint={error}
+        actionLabel="重试"
+        onAction={() => setReloadNonce((n) => n + 1)}
+      />
+    );
+  }
+  if (!data) return <LoadingState />;
 
   const pieData = data.statusDistribution
     .filter((s) => s.count > 0)

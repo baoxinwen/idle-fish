@@ -25,8 +25,8 @@ async function waitFonts() {
   }
 }
 
-/** DOM 节点 → PNG dataURL */
-export async function domToPngDataUrl(node: HTMLElement, options?: { bg?: string }): Promise<string> {
+/** DOM 节点 → PNG dataURL（模块私有：仅 exportNodeAsPng 使用，第八轮 F-07 收回导出） */
+async function domToPngDataUrl(node: HTMLElement, options?: { bg?: string }): Promise<string> {
   await waitFonts();
   const { toPng } = await import('html-to-image');
   return toPng(node, {
