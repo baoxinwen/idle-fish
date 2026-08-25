@@ -11,9 +11,16 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - IDLEFISH_HOST=0.0.0.0
+      # 与反代跳数匹配（单层反代/Cloudflare Tunnel = 1；未用反代直暴公网 = 0，否则限流可被伪造 XFF 绕过）
       - IDLEFISH_TRUST_PROXY=1
       - IDLEFISH_DATA_DIR=/data
       - TZ=Asia/Shanghai
+      # 日志级别（可选）：默认 info；排障时可临时设 debug/verbose，无需改码重建
+      # - LOG_LEVEL=debug
+      # Cookie Secure 开关：默认生产开启（cookie 仅经 HTTPS 发送）。
+      # 如需在受信任内网用 http://<LAN-IP>:3000 直接访问并保持登录，取消注释下一行；
+      # 公网部署严禁关闭，否则会话 cookie 可被明文窃取。
+      # - IDLEFISH_COOKIE_SECURE=0
 
 volumes:
   idlefish-data:

@@ -84,6 +84,16 @@ const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
 };
 app.use(errorHandler);
 
+// S-2①兜底：Express 4 不把 async handler 的 rejection 转发给错误中间件；
+// 已知 await 点均已用 asyncHandler 包装，此处再捕获任何漏网的 rejection——
+// 记录而非按 Node 默认行为退出进程（单用户工具可用性优先）。
+process.on('unhandledRejection', (reason) => {
+  log.error(
+    'server',
+    `未处理的 promise rejection: ${reason instanceof Error ? reason.stack ?? reason.message : String(reason)}`,
+  );
+});
+
 app.listen(PORT, BIND_HOST, () => {
   log.info('server', `IdleFish server running at http://${BIND_HOST}:${PORT}`);
 });

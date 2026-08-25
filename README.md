@@ -65,11 +65,13 @@ docker logs idlefish   # 抄取 setup token
 
 - 公网访问经反向代理或隧道（如 nginx/Caddy、Cloudflare Tunnel）终结 HTTPS，应用不自行处理证书
 - 代理需透传真实客户端 IP 的 `X-Forwarded-For`；`IDLEFISH_TRUST_PROXY` 与代理跳数匹配（单层=1，compose 已设），登录限流才能按真实 IP 生效
+- 登录依赖 Secure cookie：生产环境只能经 HTTPS（或本机 localhost）访问。局域网 `http://<IP>:3000` 直访无法保持登录——确有需要时在 compose 中设 `IDLEFISH_COOKIE_SECURE=0`（仅限受信任内网，公网严禁）
 
 ## 目录结构
 
 ```
 IdleFish/
+├── docs/              # 需求规格 / 技术方案 / 审查修复说明
 ├── packages/
 │   └── shared/      # 前后端共享：类型、zod、计价纯函数
 ├── client/          # React 前端

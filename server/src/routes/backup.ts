@@ -4,9 +4,9 @@
  *  - POST /api/backup/restore 上传 .db 文件覆盖恢复（先自动备份当前库）
  */
 
-import { Router } from 'express';
+import { Router, type NextFunction, type Request, type Response } from 'express';
 import multer from 'multer';
-import { copyFileSync, createReadStream, createWriteStream, existsSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync } from 'node:fs';
+import { copyFileSync, createReadStream, createWriteStream, existsSync, closeSync, openSync, readSync, readdirSync, renameSync, statSync, unlinkSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { Database as DBType } from 'better-sqlite3';
@@ -19,11 +19,20 @@ const MAX_AUTO_BACKUPS = 5;
 /** SQLite 文件头 magic：前 16 字节为 "SQLite format 3\0" */
 const SQLITE_MAGIC = Buffer.from('SQLite format 3\0', 'utf8');
 function isSqliteFile(path: string): boolean {
+  // 只读前 16 字节判魔数：此前用 readFileSync 整读文件（上限 100MB 全量进内存），纯属浪费
+  let fd: number | null = null;
   try {
-    const head = readFileSync(path, { encoding: null }).subarray(0, 16);
+    fd = openSync(path, 'r');
+    const head = Buffer.alloc(16);
+    const bytesRead = readSync(fd, head, 0, 16, 0);
+    if (bytesRead < 16) return false;
     return SQLITE_MAGIC.equals(head);
   } catch {
     return false;
+  } finally {
+    if (fd !== null) {
+      try { closeSync(fd); } catch { /* ignore */ }
+    }
   }
 }
 
@@ -89,21 +98,54 @@ const upload = multer({ dest: join(dirname(getDbPath()), '_uploads'), limits: { 
 // 导出当前数据库
 backupRouter.get('/', async (_req, res) => {
   const dbPath = getDbPath();
+  const dir = dirname(dbPath);
   if (!existsSync(dbPath)) return res.status(404).json({ error: '数据库文件不存在' });
-  // 先 checkpoint：把 WAL 中未合并的写入刷入主库，确保导出的 .db 含全部最新数据
-  try {
-    getDb().pragma('wal_checkpoint(TRUNCATE)');
-  } catch {
-    // checkpoint 失败不阻断导出（极端情况导出可能略旧）
-  }
+  // 用 better-sqlite3 在线备份 API 生成一致性快照后再发送。
+  // 此前「checkpoint 后直接流式读主库文件」有竞态：传输窗口内若其他请求累计提交约
+  // wal_autocheckpoint(1000) 页写入，自动检查点会把页写回正在被读取的主文件，
+  // 接收端拿到新旧混杂的损坏备份；且预发的 Content-Length 随文件增长漂移。
   const date = new Date().toISOString().slice(0, 10);
-  const filename = `idlefish-backup-${date}.db`;
-  res.setHeader('Content-Type', 'application/octet-stream');
-  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  res.setHeader('Content-Length', statSync(dbPath).size);
-  log.info('backup', '导出数据库', { ip: _req.ip });
-  await pipeline(createReadStream(dbPath), res);
+  const snapshotPath = join(dir, `_export-${Date.now()}.tmp`);
+  try {
+    await getDb().backup(snapshotPath);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="idlefish-backup-${date}.db"`);
+    res.setHeader('Content-Length', statSync(snapshotPath).size);
+    res.setHeader('Cache-Control', 'no-store'); // 整库备份禁止任何中间层缓存
+    log.info('backup', '导出数据库', { ip: _req.ip });
+    await pipeline(createReadStream(snapshotPath), res);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    log.error('backup', `导出失败: ${msg}`);
+    if (!res.headersSent) {
+      res.status(500).json({ error: '数据库导出失败' });
+    } else {
+      res.end();
+    }
+  } finally {
+    try { unlinkSync(snapshotPath); } catch { /* ignore */ }
+  }
 });
+
+/** S-5：跨平台替换目标文件——POSIX rename 原子覆盖已存在目标；Windows 目标存在时报错，
+ *  降级为 unlink+rename，再降级为流式覆盖。三级降级链自包含、可独立测试。 */
+async function replaceDbFile(target: string, src: string): Promise<void> {
+  try {
+    renameSync(src, target);
+    return;
+  } catch {
+    // 继续降级
+  }
+  try {
+    unlinkSync(target);
+    renameSync(src, target);
+    return;
+  } catch {
+    // 最后降级为流式复制
+  }
+  await pipeline(createReadStream(src), createWriteStream(target));
+  unlinkSync(src);
+}
 
 // 导入恢复
 backupRouter.post('/restore', upload.single('file'), async (req, res) => {
@@ -128,8 +170,11 @@ backupRouter.post('/restore', upload.single('file'), async (req, res) => {
       verifyDb.close();
     }
   } catch (err) {
-    unlinkSync(req.file.path);
-    return res.status(400).json({ error: '恢复失败：数据库结构不匹配', detail: String(err) });
+    const verifyErrMsg = err instanceof Error ? err.message : String(err);
+    log.warn('backup', `恢复被拒绝（结构校验）: ${verifyErrMsg}`, { ip: req.ip });
+    try { unlinkSync(req.file.path); } catch { /* ignore */ }
+    // 对外只给固定文案：err.message 可能含表名/文件路径等内部细节
+    return res.status(400).json({ error: '恢复失败：数据库结构不匹配' });
   }
 
   let autoBackupPath: string | null = null;
@@ -153,19 +198,8 @@ backupRouter.post('/restore', upload.single('file'), async (req, res) => {
       copyFileSync(dbPath, autoBackupPath);
     }
 
-    // 6) 用上传文件替换 dbPath：POSIX 上 renameSync 原子覆盖已存在目标；
-    //    Windows 目标存在会报错，回退到 unlink + rename，再回退到流式覆盖
-    try {
-      renameSync(req.file.path, dbPath);
-    } catch {
-      try {
-        unlinkSync(dbPath);
-        renameSync(req.file.path, dbPath);
-      } catch {
-        await pipeline(createReadStream(req.file.path), createWriteStream(dbPath));
-        unlinkSync(req.file.path);
-      }
-    }
+    // 6) 用上传文件替换 dbPath（S-5：跨平台三级降级链抽为独立函数）
+    await replaceDbFile(dbPath, req.file.path);
 
     // 7) 清理旧库残留的 -wal/-shm（属于旧库，不应被新库继承）
     for (const suffix of ['-wal', '-shm']) {
@@ -182,16 +216,24 @@ backupRouter.post('/restore', upload.single('file'), async (req, res) => {
     // 8) 重新打开（getDb 会幂等建表，恢复的库结构已校验通过）
     getDb();
 
+    // 8.1) 清空随库带入的 sessions（M2）：上传备份中的 session 行一律视为不可信凭据——
+    //      恢复一份「改密前」的备份会同时复活旧密码 hash 与当时的活跃会话行，抵消轮换意义；
+    //      共享/来路不明的备份中未过期 sid 的持有者将无需密码直接登录。
+    //      清空后所有客户端（含当前管理员）强制重新登录。
+    getDb().prepare('DELETE FROM sessions').run();
+
     // 9) 清理过期的恢复前自动备份，仅保留最近若干份
     pruneAutoBackups(dir);
 
     res.json({
       ok: true,
       autoBackup: autoBackupPath ? basename(autoBackupPath) : null,
-      message: '恢复成功，已自动备份原库',
+      message: '恢复成功，已自动备份原库；所有用户需重新登录',
     });
     log.info('backup', '恢复成功', { autoBackup: autoBackupPath ? basename(autoBackupPath) : null, ip: req.ip });
   } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    log.error('backup', `恢复失败: ${errMsg}`, { ip: req.ip });
     // 回滚：把 autoBackup 移回 dbPath，恢复连接，避免应用持续不可用
     try {
       if (autoBackupPath && existsSync(autoBackupPath)) {
@@ -200,13 +242,40 @@ backupRouter.post('/restore', upload.single('file'), async (req, res) => {
       }
       getDb(); // 重新打开原库
     } catch (rollbackErr) {
-      // 回滚也失败：至少返回明确错误，db 保持 null，下次 getDb 会按 dbPath 重试
+      const rollMsg = rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr);
+      log.error('backup', `恢复失败且回滚失败: ${rollMsg}`, { ip: req.ip });
+      // 不回传 err/rollback 详情（Error message 可能含绝对路径），只给处置指引
       return res.status(500).json({
         error: '恢复失败且回滚失败，请手动恢复 data 目录下的 idlefish-before-restore-*.db',
-        detail: String(err),
-        rollback: String(rollbackErr),
       });
     }
-    res.status(500).json({ error: '恢复失败，已回滚到原库', detail: String(err) });
+    res.status(500).json({ error: '恢复失败，已回滚到原库' });
   }
+});
+
+// 启动时清扫上次运行残留的上传临时文件：
+// multer 在「上传完成后的处理失败」路径会清理临时文件，但进程被 SIGKILL/OOM 打断时来不及清理，
+// 残留会随时间堆积。启动瞬间不可能有进行中的上传，全量清空安全。
+try {
+  const uploadsDir = join(dirname(getDbPath()), '_uploads');
+  for (const f of readdirSync(uploadsDir)) {
+    try { unlinkSync(join(uploadsDir, f)); } catch { /* 单个失败忽略 */ }
+  }
+} catch {
+  /* 目录不存在等，忽略 */
+}
+
+// S-2②：multer 中间件错误（如超 100MB 触发 LIMIT_FILE_SIZE）经 next(err) 到达这里。
+// 若落全局 errorHandler 会被误报为 500/error 级日志——实为客户端输入问题：
+// multer 错误按 400 处理（超限给明确文案），其余按 500 泛化；级别统一降为 warn。
+backupRouter.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const msg = err instanceof Error ? err.message : String(err);
+  const isMulter = err instanceof multer.MulterError;
+  log.warn('backup', `备份上传失败: ${msg}`, { isMulter });
+  if (res.headersSent) return;
+  if (isMulter && err.code === 'LIMIT_FILE_SIZE') {
+    res.status(413).json({ error: '备份文件过大（上限 100MB）' });
+    return;
+  }
+  res.status(isMulter ? 400 : 500).json({ error: '备份上传失败' });
 });

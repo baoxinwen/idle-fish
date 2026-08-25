@@ -104,22 +104,30 @@ export function cookieOptions(isClear = false) {
   return {
     httpOnly: true,
     sameSite: 'strict' as const,
-    secure: process.env.NODE_ENV === 'production',
+    // Secure 开关：默认生产开启（cookie 仅经 HTTPS 发送）。可用 IDLEFISH_COOKIE_SECURE 显式覆盖：
+    // '0' 关闭（仅供受信任内网 HTTP 直访使用，公网禁用），'1' 强制开启。
+    // 未设置环境变量时按 NODE_ENV 判定。
+    secure: process.env.IDLEFISH_COOKIE_SECURE
+      ? process.env.IDLEFISH_COOKIE_SECURE === '1'
+      : process.env.NODE_ENV === 'production',
     path: '/',
     maxAge: isClear ? 0 : SESSION_MAX_AGE_MS,
   };
 }
-
-/** 当前 ISO 时间（复用 no.ts，保证与 quotes/orders 口径一致，含毫秒） */
 
 /** 计算 expires_at（now + 7d） */
 function expiryIso(): string {
   return new Date(Date.now() + SESSION_MAX_AGE_MS).toISOString();
 }
 
-/** bcrypt 哈希（rounds=10） */
+/** bcrypt 哈希成本因子（轮数）。10 ≈ 单次 ~100ms，与登录限流（5 次/分）配套 */
+const BCRYPT_ROUNDS = 10;
+/** 会话 id 长度（nanoid 字符数） */
+const SESSION_SID_LENGTH = 32;
+
+/** bcrypt 哈希 */
 export function hashPassword(plain: string): Promise<string> {
-  return bcrypt.hash(plain, 10);
+  return bcrypt.hash(plain, BCRYPT_ROUNDS);
 }
 
 /** 校验密码 */
@@ -144,7 +152,7 @@ export function getUser(): UserRow | undefined {
  */
 export function createSession(userId: number): { sid: string; expiresAt: string } {
   const db = getDb();
-  const sid = nanoid(32);
+  const sid = nanoid(SESSION_SID_LENGTH);
   const now = nowIso();
   const expiresAt = expiryIso();
   const tx = db.transaction(() => {

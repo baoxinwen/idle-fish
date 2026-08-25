@@ -3,9 +3,10 @@
  */
 
 import { Router } from 'express';
-import { settingsSchema, type Settings } from '@idlefish/shared';
+import { DEFAULT_SETTINGS, settingsSchema, type Settings } from '@idlefish/shared';
 import { getDb } from '../db/index.js';
 import { nowIso } from '../lib/no.js';
+import { log } from '../lib/logger.js';
 
 export const settingsRouter = Router();
 
@@ -14,7 +15,14 @@ settingsRouter.get('/', (_req, res) => {
     | { data: string }
     | undefined;
   if (!row) return res.status(404).json({ error: '设置不存在' });
-  res.json(JSON.parse(row.data) as Settings);
+  try {
+    res.json(JSON.parse(row.data) as Settings);
+  } catch (err) {
+    // L2：settings.data 损坏（如恢复了一份内容非法的构造备份）不应让设置页永久 500——
+    // quotes/orders 列表均有逐行容错，此处对齐；回落种子默认值保证应用可用。
+    log.error('settings', `settings.data 解析失败，回落默认值: ${err instanceof Error ? err.message : String(err)}`);
+    res.json(DEFAULT_SETTINGS);
+  }
 });
 
 settingsRouter.put('/', (req, res) => {
@@ -24,5 +32,7 @@ settingsRouter.put('/', (req, res) => {
   }
   const settings = parsed.data as Settings;
   getDb().prepare('UPDATE settings SET data = ? WHERE id = 1').run(JSON.stringify(settings));
+  // 第八轮日志矩阵：影响此后所有报价/订单默认值的关键写操作，留痕（不放 payload，体积大且无必要）
+  log.info('settings', '设置已更新', { ip: req.ip });
   res.json({ updatedAt: nowIso() });
 });

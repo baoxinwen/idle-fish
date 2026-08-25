@@ -49,7 +49,8 @@ const consoleFormat = format.combine(
 );
 
 export const logger = createLogger({
-  level: 'info',
+  // 第八轮 S-日志：支持 LOG_LEVEL 环境变量（排障时临时开 debug/verbose，无需改码重建）
+  level: process.env.LOG_LEVEL ?? 'info',
   format: baseFormat,
   transports: [
     // app.log：所有级别，轮转

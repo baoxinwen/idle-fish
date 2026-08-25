@@ -1,5 +1,7 @@
 /**
- * 统计聚合路由 �?供经营统计看板使用�? * 指标�?+ 订单状态分�?+ 趋势 + 最近列表�? */
+ * 统计聚合路由 — 供经营统计看板使用。
+ * 指标卡 + 订单状态分布 + 趋势 + 最近列表。
+ */
 
 import { Router } from 'express';
 import {
@@ -30,19 +32,22 @@ statsRouter.get('/', (req, res) => {
     .prepare(`SELECT id, order_no, status, customer, finance, shipping, created_at FROM orders WHERE created_at >= ? ORDER BY created_at DESC`)
     .all(since) as OrderRow[];
 
-  // ---- 指标�?----
+  // ---- 指标卡 ----
   const quoteCount = quotes.length;
-  const quoteTotalAmount = quotes.reduce((s, q) => s + (parseResult(q.result)?.finalPrice ?? 0), 0);
+  const quoteTotalAmount = quotes.reduce(
+    (s, q) => s + (parseJson<{ finalPrice?: number }>(q.result)?.finalPrice ?? 0),
+    0,
+  );
   const convertedCount = quotes.filter((q) => q.status === 'converted').length;
   const conversionRatePct = quoteCount > 0 ? roundMoney((convertedCount / quoteCount) * 100) : 0;
 
   const orderCount = orders.length;
   const closedOrders = orders.filter((o) => o.status === 'shipped' || o.status === 'done');
 
-  // 归一化已结订单的财务数据（避免重复 parseShipping/parseFinance）
+  // 归一化已结订单的财务数据（避免重复解析）
   const closedFinance = closedOrders.map((o) => {
-    const ship = o.shipping ? parseShipping(o.shipping) : null;
-    const f = parseFinance(o.finance);
+    const ship = o.shipping ? parseJson<{ actualProfit?: number; actualProfitRatePct?: number }>(o.shipping) : null;
+    const f = parseJson<{ actualPrice?: number; estimatedProfit?: number; estimatedProfitRatePct?: number }>(o.finance);
     return {
       actualPrice: f?.actualPrice ?? 0,
       profit: ship?.actualProfit ?? f?.estimatedProfit ?? 0,
@@ -59,23 +64,23 @@ statsRouter.get('/', (req, res) => {
 
   const statusDistribution = aggregateStatus(orders.map((o) => o.status));
 
-  // ---- 趋势（按�?or 按月�?---
+  // ---- 趋势（按天或按月）----
   const trend = buildTrend(quotes, orders, byMonth, range);
 
-  // ---- 最近列�?----
-  const recentQuotes = quotes.slice(0, 10).map((q) => ({
+  // ---- 最近列表 ----
+  const recentQuotes = quotes.slice(0, RECENT_LIMIT).map((q) => ({
     id: q.id,
     quoteNo: q.quote_no,
-    finalPrice: parseResult(q.result)?.finalPrice ?? 0,
+    finalPrice: parseJson<{ finalPrice?: number }>(q.result)?.finalPrice ?? 0,
     status: q.status as QuoteStatus,
     createdAt: q.created_at,
   }));
 
-  const recentOrders = orders.slice(0, 10).map((o) => ({
+  const recentOrders = orders.slice(0, RECENT_LIMIT).map((o) => ({
     id: o.id,
     orderNo: o.order_no,
-    customerName: parseCustomer(o.customer)?.name ?? '',
-    actualPrice: parseFinance(o.finance)?.actualPrice ?? 0,
+    customerName: parseJson<{ name?: string }>(o.customer)?.name ?? '',
+    actualPrice: parseJson<{ actualPrice?: number }>(o.finance)?.actualPrice ?? 0,
     status: o.status as OrderStatus,
     createdAt: o.created_at,
   }));
@@ -116,17 +121,17 @@ interface OrderRow {
 }
 
 // ---- 辅助 ----
-function parseResult(s: string): { finalPrice?: number } | null {
-  try { return JSON.parse(s); } catch { return null; }
-}
-function parseFinance(s: string): { actualPrice?: number; estimatedProfit?: number; estimatedProfitRatePct?: number } | null {
-  try { return JSON.parse(s); } catch { return null; }
-}
-function parseShipping(s: string): { actualProfit?: number; actualProfitRatePct?: number } | null {
-  try { return JSON.parse(s); } catch { return null; }
-}
-function parseCustomer(s: string): { name?: string } | null {
-  try { return JSON.parse(s); } catch { return null; }
+
+/** 最近列表条数（S-8：原两处魔法数 10 具名） */
+const RECENT_LIMIT = 10;
+
+/** S-6：四个同构 JSON.parse 助手泛型合一——损坏返回 null（列表容错口径） */
+function parseJson<T>(s: string): T | null {
+  try {
+    return JSON.parse(s) as T;
+  } catch {
+    return null;
+  }
 }
 
 /** 范围 → 天数（all 返回 null） */
@@ -186,8 +191,8 @@ function buildTrend(
     const e = map.get(k) ?? { quoteCount: 0, orderCount: 0, profit: 0 };
     e.orderCount += 1;
     if (o.status === 'shipped' || o.status === 'done') {
-      const ship = o.shipping ? parseShipping(o.shipping) : null;
-      const f = parseFinance(o.finance);
+      const ship = o.shipping ? parseJson<{ actualProfit?: number }>(o.shipping) : null;
+      const f = parseJson<{ estimatedProfit?: number }>(o.finance);
       e.profit += ship?.actualProfit ?? f?.estimatedProfit ?? 0;
     }
     map.set(k, e);

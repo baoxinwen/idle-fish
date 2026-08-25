@@ -57,6 +57,10 @@ ENV IDLEFISH_DATA_DIR=/data
 # 不在此处 USER appuser——entrypoint 需以 root 启动修正 /data 权限后再切
 EXPOSE 3000
 
+# 健康检查：slim 镜像无 curl/wget，用 node 内置 fetch 探测应用自带 /api/health
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>{process.exitCode=r.ok?0:1}).catch(()=>{process.exitCode=1})"
+
 # entrypoint：root 修正 /data 属主 → gosu 切 appuser → 执行 node
 # named volume 挂载后 /data 属主可能是 root，appuser 无写权限会导致 mkdir /data/logs 失败
 ENTRYPOINT ["sh", "-c", "chown -R appuser:appgrp /data && exec gosu appuser node server/dist/index.js"]

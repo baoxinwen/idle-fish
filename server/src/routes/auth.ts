@@ -23,6 +23,7 @@ import {
 } from '../lib/auth.js';
 import { nowIso } from '../lib/no.js';
 import { log } from '../lib/logger.js';
+import { asyncHandler } from '../lib/http-error.js';
 
 export const authRouter = Router();
 /** 受鉴权保护的 auth 路由（需 session + 限流）：改密等。挂在 requireAuth gate 之后。 */
@@ -34,7 +35,7 @@ export const authProtectedRouter = Router();
  */
 const authLimiter = rateLimit({
   windowMs: 60_000,
-  max: 5,
+  limit: 5, // v8 起推荐 limit（旧名 max 为兼容别名）
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: '登录尝试过于频繁，请稍后再试' },
@@ -50,7 +51,7 @@ authRouter.get('/status', (req, res) => {
 
 // 首次设置：创建唯一管理员账户，之后不再开放
 // 公网部署下需带 IDLEFISH_SETUP_TOKEN（请求头 x-setup-token），防止首启窗口被抢注
-authRouter.post('/setup', authLimiter, async (req, res) => {
+authRouter.post('/setup', authLimiter, asyncHandler(async (req, res) => {
   if (userExists()) {
     return res.status(409).json({ error: '管理员账户已存在' });
   }
@@ -73,10 +74,10 @@ authRouter.post('/setup', authLimiter, async (req, res) => {
   res.cookie(COOKIE_NAME, sid, cookieOptions());
   log.info('auth', '首次设置完成', { user: username, ip: req.ip });
   res.json({ authenticated: true });
-});
+}));
 
 // 登录
-authRouter.post('/login', authLimiter, async (req, res) => {
+authRouter.post('/login', authLimiter, asyncHandler(async (req, res) => {
   if (!userExists()) {
     return res.status(409).json({ error: '尚未初始化，请先完成首次设置', needsSetup: true });
   }
@@ -95,7 +96,7 @@ authRouter.post('/login', authLimiter, async (req, res) => {
   res.cookie(COOKIE_NAME, sid, cookieOptions());
   log.info('auth', '登录成功', { user: username, ip: req.ip });
   res.json({ authenticated: true });
-});
+}));
 
 // 登出：销毁会话 + 清 cookie（无有效会话也允许调用）
 authRouter.post('/logout', (req, res) => {
@@ -113,7 +114,7 @@ authRouter.post('/logout', (req, res) => {
 
 // 改密：需当前会话（requireAuth gate）+ 限流 + 旧密码校验。
 // 挂在 authProtectedRouter 上，在 index.ts 的 gate 之后注册。
-authProtectedRouter.post('/password', authLimiter, async (req, res) => {
+authProtectedRouter.post('/password', authLimiter, asyncHandler(async (req, res) => {
   const parsed = z
     .object({
       oldPassword: z.string().min(1),
@@ -122,6 +123,10 @@ authProtectedRouter.post('/password', authLimiter, async (req, res) => {
     .refine((d) => d.newPassword !== d.oldPassword, {
       path: ['newPassword'],
       message: '新密码不能与旧密码相同',
+    })
+    .refine((d) => new TextEncoder().encode(d.newPassword).length <= 72, {
+      path: ['newPassword'],
+      message: '密码过长（UTF-8 编码需不超过 72 字节，超出部分 bcrypt 不参与哈希）',
     })
     .safeParse(req.body);
   if (!parsed.success) {
@@ -138,12 +143,13 @@ authProtectedRouter.post('/password', authLimiter, async (req, res) => {
   }
   const newHash = await hashPassword(newPassword);
   getDb().prepare('UPDATE users SET password_hash = ? WHERE id = 1').run(newHash);
-  // 会话轮换：销毁全部会话（含当前），再为新密码签发新会话，
-  // 被窃取的旧 cookie 副本在改密后立即失效（之前 destroyOtherSessions 保留当前会话）。
-  const currentSid = req.cookies?.[COOKIE_NAME] as string | undefined;
-  if (currentSid) destroySession(currentSid);
+  // 会话轮换（H1 回归修复）：销毁【全部】会话——当前与其他设备的被窃 cookie 一并失效——
+  // 再为新密码签发唯一新会话给当前设备。
+  // 历史：fb84aa4 曾误把 destroyOtherSessions(保留当前) 改成仅 destroySession(currentSid)，
+  // 导致「销毁全部」只落在注释里、其他设备会话在改密后仍存活，此处纠正为文档化语义。
+  getDb().prepare('DELETE FROM sessions').run();
   const { sid } = createSession(user.id);
   res.cookie(COOKIE_NAME, sid, cookieOptions());
   log.info('auth', '改密成功，已轮换会话', { user: user.username, ip: req.ip });
   res.json({ ok: true });
-});
+}));
