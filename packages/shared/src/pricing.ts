@@ -179,25 +179,42 @@ export function calcQuote(input: QuoteInput): QuoteResult {
 
 // ---------- 订单侧财务计算 ----------
 
-/** 订单预估财务：预估成本 / 预估利润 / 预估毛利率 */
+/** 订单预估财务：预估成本 / 预估利润 / 预估毛利率。
+ *  order 的运费是下单时预估运费；发货时用 actualFreight 替换，避免重复计入。 */
 export function calcOrderFinance(
   materialCost: number,
-  otherFee: number,
+  installFee: number,
+  freight: number,
   actualPrice: number,
 ): {
+  installFee: number;
+  freight: number;
+  otherFee: number;
   estimatedCost: number;
   estimatedProfit: number;
   estimatedProfitRatePct: number;
 } {
+  const install = roundMoney(installFee);
+  const freightAmount = roundMoney(freight);
+  const otherFee = roundMoney(install + freightAmount);
   const estimatedCost = roundMoney(materialCost + otherFee);
   const estimatedProfit = roundMoney(actualPrice - estimatedCost);
   const estimatedProfitRatePct = calcProfitRatePct(estimatedProfit, actualPrice);
-  return { estimatedCost, estimatedProfit, estimatedProfitRatePct };
+  return {
+    installFee: install,
+    freight: freightAmount,
+    otherFee,
+    estimatedCost,
+    estimatedProfit,
+    estimatedProfitRatePct,
+  };
 }
 
-/** 发货后实际财务：实际成本 / 实际利润 / 实际毛利率 */
+/** 发货后实际财务：实际成本 / 实际利润 / 实际毛利率。
+ *  下单时若有预估运费，发货时用实际运费替换。 */
 export function calcActualFinance(
-  estimatedCost: number,
+  materialCost: number,
+  installFee: number,
   actualPrice: number,
   actualFreight: number,
 ): {
@@ -205,7 +222,7 @@ export function calcActualFinance(
   actualProfit: number;
   actualProfitRatePct: number;
 } {
-  const actualCost = roundMoney(estimatedCost + actualFreight);
+  const actualCost = roundMoney(materialCost + installFee + actualFreight);
   const actualProfit = roundMoney(actualPrice - actualCost);
   const actualProfitRatePct = calcProfitRatePct(actualProfit, actualPrice);
   return { actualCost, actualProfit, actualProfitRatePct };

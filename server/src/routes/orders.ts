@@ -8,6 +8,7 @@ import { z } from 'zod';
 import {
   calcActualFinance,
   calcOrderFinance,
+  money,
   orderStatusSchema,
   customerInfoSchema,
   shippingAddressSchema,
@@ -19,39 +20,35 @@ import {
   type ShippingAddress,
   type CabinetSize,
   type AccessoryItem,
+  type OrderFinance,
 } from '@idlefish/shared';
 import { getDb } from '../db/index.js';
 import { nextBusinessNo, nowIso } from '../lib/no.js';
 import { insertOrder } from '../lib/insert-order.js';
 import { log } from '../lib/logger.js';
+import { HttpError, sendTxError } from '../lib/http-error.js';
 
 export const ordersRouter = Router();
-
-/** 带 HTTP 状态码的错误，用于事务内抛出 */
-class HttpError extends Error {
-  constructor(readonly status: number, message: string) {
-    super(message);
-  }
-}
 
 const createOrderBodySchema = z.object({
   customer: customerInfoSchema,
   shippingAddress: shippingAddressSchema,
   size: cabinetSizeSchema,
   materials: z.array(accessoryItemSchema),
-  materialCost: z.number().nonnegative(),
-  otherFee: z.number().nonnegative().optional().default(0),
-  actualPrice: z.number().nonnegative(),
-  remark: z.string().optional().default(''),
+  materialCost: money(),
+  installFee: money().optional().default(0),
+  freight: money().optional().default(0),
+  actualPrice: money(),
+  remark: z.string().max(1000).optional().default(''),
 });
 
 const updateOrderBodySchema = createOrderBodySchema.partial();
 
 const shipBodySchema = z.object({
-  courier: z.string().min(1),
-  trackingNo: z.string().min(1),
-  actualFreight: z.number().nonnegative(),
-  checkRemark: z.string().optional().default(''),
+  courier: z.string().min(1).max(50),
+  trackingNo: z.string().min(1).max(64),
+  actualFreight: money(),
+  checkRemark: z.string().max(1000).optional().default(''),
 });
 
 const statusTransition: Record<OrderStatus, OrderStatus[]> = {
@@ -92,15 +89,16 @@ ordersRouter.post('/', (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: '参数校验失败', detail: parsed.error.flatten() });
   }
-  const b = parsed.data;
+  const body = parsed.data;
   const db = getDb();
   const id = nanoid();
   const now = nowIso();
   const finance = {
-    materialCost: b.materialCost,
-    otherFee: b.otherFee,
-    actualPrice: b.actualPrice,
-    ...calcOrderFinance(b.materialCost, b.otherFee, b.actualPrice),
+    ...calcOrderFinance(body.materialCost, body.installFee, body.freight, body.actualPrice),
+    materialCost: body.materialCost,
+    installFee: body.installFee,
+    freight: body.freight,
+    actualPrice: body.actualPrice,
   };
 
   const tx = db.transaction(() => {
@@ -109,17 +107,18 @@ ordersRouter.post('/', (req, res) => {
       id,
       orderNo,
       quoteId: null,
-      customer: b.customer,
-      shippingAddress: b.shippingAddress,
-      size: b.size,
-      materials: b.materials,
+      customer: body.customer,
+      shippingAddress: body.shippingAddress,
+      size: body.size,
+      materials: body.materials,
       finance,
-      remark: b.remark,
+      remark: body.remark,
       now,
     });
     return orderNo;
   });
   const orderNo = tx();
+  log.info('order', '新建订单', { orderNo, ip: req.ip });
   res.status(201).json({ id, orderNo, status: 'pending', finance });
 });
 
@@ -129,7 +128,7 @@ ordersRouter.put('/:id', (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: '参数校验失败', detail: parsed.error.flatten() });
   }
-  const b = parsed.data;
+  const body = parsed.data;
   const db = getDb();
   const now = nowIso();
 
@@ -147,24 +146,26 @@ ordersRouter.put('/:id', (req, res) => {
     let shippingAddress: ShippingAddress;
     let size: CabinetSize;
     let materials: AccessoryItem[];
-    let oldFinance: { materialCost: number; otherFee: number; actualPrice: number };
+    let oldFinance: OrderFinance;
     try {
-      customer = b.customer ?? JSON.parse(row.customer);
-      shippingAddress = b.shippingAddress ?? JSON.parse(row.shipping_address);
-      size = b.size ?? JSON.parse(row.size);
-      materials = b.materials ?? JSON.parse(row.materials);
-      oldFinance = JSON.parse(row.finance);
+      customer = body.customer ?? JSON.parse(row.customer);
+      shippingAddress = body.shippingAddress ?? JSON.parse(row.shipping_address);
+      size = body.size ?? JSON.parse(row.size);
+      materials = body.materials ?? JSON.parse(row.materials);
+      oldFinance = normalizeOrderFinance(JSON.parse(row.finance));
     } catch {
       throw new HttpError(422, '订单数据损坏，无法编辑');
     }
-    const materialCost = b.materialCost ?? oldFinance.materialCost;
-    const otherFee = b.otherFee ?? oldFinance.otherFee;
-    const actualPrice = b.actualPrice ?? oldFinance.actualPrice;
+    const materialCost = body.materialCost ?? oldFinance.materialCost;
+    const installFee = body.installFee ?? oldFinance.installFee;
+    const freight = body.freight ?? oldFinance.freight;
+    const actualPrice = body.actualPrice ?? oldFinance.actualPrice;
     const finance = {
+      ...calcOrderFinance(materialCost, installFee, freight, actualPrice),
       materialCost,
-      otherFee,
+      installFee,
+      freight,
       actualPrice,
-      ...calcOrderFinance(materialCost, otherFee, actualPrice),
     };
 
     // 条件 UPDATE：仅当状态仍非 shipped/done 时才更新，防并发覆盖
@@ -179,20 +180,20 @@ ordersRouter.put('/:id', (req, res) => {
         JSON.stringify(size),
         JSON.stringify(materials),
         JSON.stringify(finance),
-        b.remark ?? row.remark,
+        body.remark ?? row.remark,
         now,
         req.params.id,
       );
     if (upd.changes === 0) throw new HttpError(409, '订单状态已变更，请刷新后重试');
-    return finance;
+    return { finance, orderNo: row.order_no };
   });
 
   try {
-    const finance = tx();
+    const { finance, orderNo } = tx();
+    log.info('order', '编辑订单', { orderNo, ip: req.ip });
     res.json({ id: req.params.id, finance, updatedAt: now });
   } catch (e) {
-    if (e instanceof HttpError) return res.status(e.status).json({ error: e.message });
-    res.status(500).json({ error: '编辑订单失败' });
+    sendTxError(res, e, '编辑订单失败');
   }
 });
 
@@ -227,8 +228,7 @@ ordersRouter.patch('/:id/status', (req, res) => {
     log.info('order', '状态流转', { orderNo, from, to: next, ip: req.ip });
     res.json({ id: req.params.id, status: next });
   } catch (e) {
-    if (e instanceof HttpError) return res.status(e.status).json({ error: e.message });
-    res.status(500).json({ error: '状态流转失败' });
+    sendTxError(res, e, '状态流转失败');
   }
 });
 
@@ -238,7 +238,7 @@ ordersRouter.post('/:id/ship', (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: '参数校验失败', detail: parsed.error.flatten() });
   }
-  const b = parsed.data;
+  const body = parsed.data;
   const db = getDb();
 
   const tx = db.transaction(() => {
@@ -249,17 +249,22 @@ ordersRouter.post('/:id/ship', (req, res) => {
     if (!row) throw new HttpError(404, '订单不存在');
     if (row.status !== 'ready') throw new HttpError(400, '仅待发货订单可发货');
 
-    const finance = JSON.parse(row.finance) as { estimatedCost: number; actualPrice: number };
-    if (typeof finance.estimatedCost !== 'number' || typeof finance.actualPrice !== 'number') {
-      throw new HttpError(422, '订单财务数据不完整');
+    // L12：先对原始 JSON 做结构校验再 normalize——normalize 会把缺失字段静默归零，
+    // 直接 normalize 会让「财务数据损坏」变成 0 元成本发货且 typeof 校验沦为死代码。
+    let rawFinanceJson: unknown;
+    try {
+      rawFinanceJson = JSON.parse(row.finance);
+    } catch {
+      throw new HttpError(422, '订单财务数据损坏，无法发货');
     }
-    const actual = calcActualFinance(finance.estimatedCost, finance.actualPrice, b.actualFreight);
+    const finance = parseRawOrderFinance(rawFinanceJson);
+    const actual = calcActualFinance(finance.materialCost, finance.installFee, finance.actualPrice, body.actualFreight);
     const now = nowIso();
     const shipping = {
-      courier: b.courier,
-      trackingNo: b.trackingNo,
-      actualFreight: b.actualFreight,
-      checkRemark: b.checkRemark,
+      courier: body.courier,
+      trackingNo: body.trackingNo,
+      actualFreight: body.actualFreight,
+      checkRemark: body.checkRemark,
       confirmedAt: now,
       ...actual,
     };
@@ -268,23 +273,30 @@ ordersRouter.post('/:id/ship', (req, res) => {
       .prepare(`UPDATE orders SET status = 'shipped', shipping = ?, updated_at = ? WHERE id = ? AND status = 'ready'`)
       .run(JSON.stringify(shipping), now, req.params.id);
     if (upd.changes === 0) throw new HttpError(400, '该订单已不在待发货状态');
-    return shipping;
+    return { shipping, orderNo: row.order_no };
   });
 
   try {
-    const shipping = tx();
-    log.info('order', '发货成功', { id: req.params.id, courier: shipping.courier, trackingNo: shipping.trackingNo, ip: req.ip });
+    const { shipping, orderNo } = tx();
+    log.info('order', '发货成功', { orderNo, id: req.params.id, courier: shipping.courier, trackingNo: shipping.trackingNo, ip: req.ip });
     res.json({ id: req.params.id, status: 'shipped', shipping });
   } catch (e) {
-    if (e instanceof HttpError) return res.status(e.status).json({ error: e.message });
-    res.status(500).json({ error: '发货失败' });
+    sendTxError(res, e, '发货失败');
   }
 });
 
-// 删除
+// 删除（L6：补状态守卫，与 PUT/ship 对称——已发货/已完成订单含财务历史，静默删除会扭曲统计）
 ordersRouter.delete('/:id', (req, res) => {
-  const info = getDb().prepare('DELETE FROM orders WHERE id = ?').run(req.params.id);
-  if (info.changes === 0) return res.status(404).json({ error: '订单不存在' });
+  const db = getDb();
+  const row = db.prepare('SELECT order_no, status FROM orders WHERE id = ?').get(req.params.id) as
+    | { order_no: string; status: OrderStatus }
+    | undefined;
+  if (!row) return res.status(404).json({ error: '订单不存在' });
+  if (row.status === 'shipped' || row.status === 'done') {
+    return res.status(409).json({ error: '已发货/已完成的订单不可删除' });
+  }
+  db.prepare('DELETE FROM orders WHERE id = ?').run(req.params.id);
+  log.info('order', '删除订单', { orderNo: row.order_no, status: row.status, ip: req.ip });
   res.status(204).end();
 });
 
@@ -315,7 +327,7 @@ function parseOrderRow(row: OrderRow): OrderRecord | null {
       shippingAddress: JSON.parse(row.shipping_address),
       size: JSON.parse(row.size),
       materials: JSON.parse(row.materials),
-      finance: JSON.parse(row.finance),
+      finance: normalizeOrderFinance(JSON.parse(row.finance)),
       shipping: row.shipping ? JSON.parse(row.shipping) : null,
       remark: row.remark,
       createdAt: row.created_at,
@@ -324,4 +336,49 @@ function parseOrderRow(row: OrderRow): OrderRecord | null {
   } catch {
     return null;
   }
+}
+
+/** 旧订单 finance 只有 otherFee；拆出 installFee/freight 时把 otherFee 归入安装费，
+ *  以保持历史订单的预估成本与利润不变。 */
+function normalizeOrderFinance(raw: unknown): OrderFinance {
+  const src = (raw ?? {}) as Partial<OrderFinance> & {
+    estimatedCost?: number;
+    estimatedProfit?: number;
+    estimatedProfitRatePct?: number;
+  };
+  const materialCost = typeof src.materialCost === 'number' ? src.materialCost : 0;
+  const actualPrice = typeof src.actualPrice === 'number' ? src.actualPrice : 0;
+  const installFee =
+    typeof src.installFee === 'number'
+      ? src.installFee
+      : typeof src.otherFee === 'number'
+        ? src.otherFee
+        : 0;
+  const freight = typeof src.freight === 'number' ? src.freight : 0;
+  return {
+    ...calcOrderFinance(materialCost, installFee, freight, actualPrice),
+    materialCost,
+    installFee,
+    freight,
+    actualPrice,
+  };
+}
+
+/** S-5：发货前的原始 finance 结构校验（损坏抛 HttpError(422)），从 ship 事务体抽出。
+ *  normalizeOrderFinance 会把缺失字段静默归零，直接 normalize 会让损坏数据变成
+ *  「0 元成本发货」——必须先在此对原始 JSON 做存在性/类型校验。 */
+function parseRawOrderFinance(rawJson: unknown): OrderFinance {
+  if (rawJson === null || typeof rawJson !== 'object') {
+    throw new HttpError(422, '订单财务数据不完整');
+  }
+  const raw = rawJson as Record<string, unknown>;
+  const hasNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  // 旧版 finance 只有 otherFee（归入安装费口径），与 installFee 二选一即可
+  if (!hasNumber(raw.materialCost) || !hasNumber(raw.actualPrice)) {
+    throw new HttpError(422, '订单财务数据不完整');
+  }
+  if (!hasNumber(raw.installFee) && !hasNumber(raw.otherFee)) {
+    throw new HttpError(422, '订单财务数据不完整');
+  }
+  return normalizeOrderFinance(rawJson);
 }

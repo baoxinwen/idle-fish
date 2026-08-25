@@ -8,6 +8,7 @@ import { Save, ArrowLeft, Download, FilePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { NumberField } from '@/components/number-field';
 import { QuoteForm } from '@/components/quote-form/quote-form';
 import { Cabinet3D } from '@/components/cabinet-3d/cabinet-3d';
 import { CostSummary } from '@/components/cost-summary/cost-summary';
@@ -16,6 +17,7 @@ import { Modal } from '@/components/ui/modal';
 import { LoadingState } from '@/components/states';
 import { useQuoteStore } from '@/store/quote-store';
 import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
+import { emptyConvertForm, type ConvertConfirmForm } from '@/lib/convert-form';
 import { useToast } from '@/components/toaster';
 import { quotesApi, settingsApi } from '@/lib/api';
 import { calcQuote, type QuoteRecord, type Settings } from '@idlefish/shared';
@@ -24,18 +26,15 @@ export function QuoteEditorPage() {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
   const toast = useToast((s) => s.show);
-  const { input, editingId, editingStatus, initialized, loadFromRecord, reset, markLoading } = useQuoteStore();
+  const { input, editingId, editingStatus, initialized, loadFromRecord, reset, markLoading, invalidateEditing } = useQuoteStore();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
   const [exportQuote, setExportQuote] = useState<QuoteRecord | null>(null);
   // 转订单弹窗
   const [convertOpen, setConvertOpen] = useState(false);
   const [converting, setConverting] = useState(false);
-  const [convertForm, setConvertForm] = useState({
-    customer: { name: '', platformOrderNo: '' },
-    shippingAddress: { receiver: '', phone: '', address: '' },
-    remark: '',
-  });
+  // F-13：转单确认表单形状与 order-editor 共用 lib/convert-form
+  const [convertForm, setConvertForm] = useState<ConvertConfirmForm>(emptyConvertForm);
 
   // 未保存修改跟踪：baseline 是上次加载/保存的 input 快照，input 变化与之比较
   const baselineRef = useRef<string>('');
@@ -64,20 +63,33 @@ export function QuoteEditorPage() {
     if (id && editingId === id && initialized) {
       return;
     }
+    let cancelled = false; // M7：竞态守卫——快速切换路由时丢弃迟到响应
     markLoading();
     justLoaded.current = true;
-    settingsApi
-      .get()
-      .then((s) => {
+    (async () => {
+      try {
+        const s = await settingsApi.get();
+        if (cancelled) return;
         setSettings(s);
         if (id) {
-          quotesApi.get(id).then((q) => loadFromRecord(q.input, q.id, q.status));
+          const q = await quotesApi.get(id);
+          if (cancelled) return;
+          loadFromRecord(q.input, q.id, q.status);
         } else {
           reset(s);
         }
-      })
-      .catch((e) => toast(`加载失败：${e}`));
-  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+      } catch (e) {
+        // M6：此前内层 promise 未 return/catch，坏 id（已删除/404/500）会永久卡 LoadingState
+        // 且产生 unhandledrejection。现在统一兜底：提示后回列表（终止态），不再无限转圈。
+        if (cancelled) return;
+        toast(`加载失败：${e}`);
+        navigate('/quotes', { replace: true });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [id]); // 依赖刻意为 id：id 变化即重新判定加载/跳过
 
   if (!initialized) {
     return <LoadingState />;
@@ -149,6 +161,7 @@ export function QuoteEditorPage() {
         customer: convertForm.customer,
         shippingAddress: convertForm.shippingAddress,
         remark: convertForm.remark,
+        finance: convertForm.finance,
       });
       toast(`已转单：${res.orderNo}`);
       justLoaded.current = true;
@@ -161,6 +174,20 @@ export function QuoteEditorPage() {
     } finally {
       setConverting(false);
     }
+  }
+
+  function openConvert() {
+    const result = calcQuote(input);
+    setConvertForm({
+      ...emptyConvertForm(),
+      finance: {
+        materialCost: result.breakdown.materialCost,
+        installFee: result.breakdown.installFee,
+        freight: result.breakdown.freight,
+        actualPrice: result.finalPrice,
+      },
+    });
+    setConvertOpen(true);
   }
 
   return (
@@ -205,7 +232,7 @@ export function QuoteEditorPage() {
           <Button
             variant="outline"
             className="shrink-0"
-            onClick={() => setConvertOpen(true)}
+            onClick={openConvert}
             disabled={saving || converting || editingStatus === 'converted'}
             title={editingStatus === 'converted' ? '该报价已转为订单' : undefined}
           >
@@ -256,12 +283,22 @@ export function QuoteEditorPage() {
           <p className="text-sm text-muted-foreground">离开会丢失当前未保存的修改，确认离开？</p>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => blocker.reset?.()}>继续编辑</Button>
-            <Button variant="destructive" onClick={() => blocker.proceed?.()}>放弃修改</Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                // M5：先丢弃 store 中的编辑态再导航——否则重进同一报价时跳过分支命中，
+                // 会复活刚被放弃的脏数据且立即标脏
+                invalidateEditing();
+                blocker.proceed?.();
+              }}
+            >
+              放弃修改
+            </Button>
           </div>
         </div>
       </Modal>
 
-      {/* 转订单弹窗：填客户/收货信息，提交时自动保存报价再转单 */}
+      {/* 转订单弹窗：填客户/收货信息并确认价格，提交时自动保存报价再转单 */}
       <Modal
         open={convertOpen}
         onClose={() => !converting && setConvertOpen(false)}
@@ -269,8 +306,38 @@ export function QuoteEditorPage() {
       >
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            转单将自动保存当前报价，并以报价的材料成本/售价创建订单。财务数据来自报价，转单后可在订单页修改。
+            转单将自动保存当前报价。请逐项确认材料成本、安装费、运费与实际售价后创建订单。
           </p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumberField
+              label="材料成本"
+              value={convertForm.finance.materialCost}
+              onChange={(v) => setConvertForm((f) => ({ ...f, finance: { ...f.finance, materialCost: v } }))}
+              step={0.01}
+              suffix="元"
+            />
+            <NumberField
+              label="安装费"
+              value={convertForm.finance.installFee}
+              onChange={(v) => setConvertForm((f) => ({ ...f, finance: { ...f.finance, installFee: v } }))}
+              step={0.01}
+              suffix="元"
+            />
+            <NumberField
+              label="运费"
+              value={convertForm.finance.freight}
+              onChange={(v) => setConvertForm((f) => ({ ...f, finance: { ...f.finance, freight: v } }))}
+              step={0.01}
+              suffix="元"
+            />
+            <NumberField
+              label="实际售价"
+              value={convertForm.finance.actualPrice}
+              onChange={(v) => setConvertForm((f) => ({ ...f, finance: { ...f.finance, actualPrice: v } }))}
+              step={0.01}
+              suffix="元"
+            />
+          </div>
           <div className="space-y-3">
             <div className="space-y-1.5">
               <Label>客户名称 *</Label>

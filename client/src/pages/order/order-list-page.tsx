@@ -3,7 +3,7 @@
  * PC：表格（整行点击进详情）；移动端：卡片列表。
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Package, ChevronRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -14,7 +14,7 @@ import { useToast } from '@/components/toaster';
 import { confirmDialog } from '@/components/confirm-dialog';
 import { LoadingState, EmptyState } from '@/components/states';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_BADGE } from '@/lib/status';
-import { formatMoney, formatDateTime, cn } from '@/lib/utils';
+import { formatMoney, formatDateTime, profitColor, cn } from '@/lib/utils';
 import type { OrderRecord, OrderStatus } from '@idlefish/shared';
 
 const FILTERS: { key: 'all' | OrderStatus; label: string }[] = [
@@ -34,19 +34,25 @@ export function OrderListPage() {
   const [filter, setFilter] = useState<'all' | OrderStatus>('all');
   const [loading, setLoading] = useState(true);
 
+  // M7：竞态守卫——快速切换筛选时丢弃迟到响应，避免旧筛选结果覆盖新列表
+  const reqSeq = useRef(0);
+
   useEffect(() => {
     refresh();
-  }, [filter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filter]); // 依赖刻意为 filter：筛选变化即重查
 
   async function refresh() {
+    const seq = ++reqSeq.current;
     setLoading(true);
     try {
       const list = await ordersApi.list(filter === 'all' ? undefined : filter);
+      if (seq !== reqSeq.current) return;
       setRecords(list);
     } catch (e) {
+      if (seq !== reqSeq.current) return;
       toast(`加载失败：${e}`);
     } finally {
-      setLoading(false);
+      if (seq === reqSeq.current) setLoading(false);
     }
   }
 
@@ -141,7 +147,7 @@ export function OrderListPage() {
                       <td className="px-4 py-3 text-right font-mono-display text-[13px] font-semibold">
                         {formatMoney(r.finance.actualPrice)}
                       </td>
-                      <td className={cn('px-4 py-3 text-right font-mono-display text-[13px] font-semibold', profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive')}>
+                      <td className={cn('px-4 py-3 text-right font-mono-display text-[13px] font-semibold', profitColor(profit))}>
                         {formatMoney(profit)}
                       </td>
                       <td className="px-4 py-3">
@@ -195,7 +201,7 @@ export function OrderListPage() {
                   <div className="mt-2 flex items-end justify-between">
                     <div>
                       <div className="font-mono-display text-base font-bold">{formatMoney(r.finance.actualPrice)}</div>
-                      <div className={cn('text-xs font-medium tabular', profit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive')}>
+                      <div className={cn('text-xs font-medium tabular', profitColor(profit))}>
                         利润 {formatMoney(profit)}
                       </div>
                     </div>

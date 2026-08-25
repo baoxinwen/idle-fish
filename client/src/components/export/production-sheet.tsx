@@ -5,9 +5,9 @@
 
 import { forwardRef } from 'react';
 import { ThreeViews } from './three-views';
-import { C, MONO, SANS } from './sheet-theme';
+import { C, MONO, SANS, PAGE_WIDTH } from './sheet-theme';
 import type { QuoteRecord } from '@idlefish/shared';
-import { formatMoney } from '@/lib/utils';
+import { formatMoney, localDate } from '@/lib/utils';
 import { COLOR_LABEL, CATEGORY_LABEL } from '@/lib/status';
 import { SIZE_GAP, toInnerSize } from '@idlefish/shared';
 
@@ -17,7 +17,7 @@ interface ProductionSheetProps {
 
 const S = {
   page: {
-    width: 800,
+    width: PAGE_WIDTH,
     background: C.paper,
     color: C.ink,
     fontFamily: SANS,
@@ -114,7 +114,9 @@ export const ProductionSheet = forwardRef<HTMLDivElement, ProductionSheetProps>(
           </div>
           <div style={S.titleCell}>
             <div style={S.titleCellLabel}>日期</div>
-            <div style={S.titleCellValue}>{quote.createdAt.slice(0, 10)}</div>
+            {/* M9：用本地时区日期——createdAt 是 UTC ISO 串，直接 slice(0,10) 会让
+                本地 0~8 点创建的单据日期错一天（发给工厂的正式单据） */}
+            <div style={S.titleCellValue}>{localDate(quote.createdAt)}</div>
           </div>
           <div style={S.titleCell}>
             <div style={S.titleCellLabel}>外径 W×D×H</div>

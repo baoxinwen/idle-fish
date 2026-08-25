@@ -20,6 +20,7 @@ import { useToast } from '@/components/toaster';
 import { LoadingState } from '@/components/states';
 import { Modal } from '@/components/ui/modal';
 import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
+import { emptyConvertForm, type ConvertConfirmForm } from '@/lib/convert-form';
 import { ordersApi, quotesApi, settingsApi } from '@/lib/api';
 import { formatMoney } from '@/lib/utils';
 import { calcOrderFinance, roundMoney } from '@idlefish/shared';
@@ -36,13 +37,9 @@ export function OrderEditorPage() {
 
   const mode: Mode = fromQuote ? 'convert' : id ? 'edit' : 'create';
 
-  // 转单模式：本地持有报价记录 + 客户/收货表单（财务来自报价，不可改）
+  // 转单模式：本地持有报价记录 + 客户/收货/财务确认表单
   const [quote, setQuote] = useState<QuoteRecord | null>(null);
-  const [convertForm, setConvertForm] = useState({
-    customer: { name: '', platformOrderNo: '' },
-    shippingAddress: { receiver: '', phone: '', address: '' },
-    remark: '',
-  });
+  const [convertForm, setConvertForm] = useState<ConvertConfirmForm>(emptyConvertForm);
 
   // 手动新建/编辑模式：用 store
   const {
@@ -56,7 +53,8 @@ export function OrderEditorPage() {
     setShippingAddress,
     setSize,
     setMaterialCost,
-    setOtherFee,
+    setInstallFee,
+    setFreight,
     setActualPrice,
     setRemark,
     updateMaterial,
@@ -80,47 +78,75 @@ export function OrderEditorPage() {
       return;
     }
     setDirty(JSON.stringify(trackSource) !== baselineRef.current);
-  }, [trackSource]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [trackSource]); // 依赖刻意绑定 trackSource 根对象引用：字段级订阅会破坏整树 dirty 比对
   const { blocker, clearDirty } = useUnsavedChanges(dirty);
 
   useEffect(() => {
+    let cancelled = false; // M7：竞态守卫——快速切换路由/参数时丢弃迟到响应
     justLoaded.current = true;
     if (mode === 'convert' && fromQuote) {
       setQuote(null); // 重新加载前清空，避免渲染上一个报价
+      // L11：整体重置确认表单——同路由连续转单（?fromQuote=A→B）不残留上一单客户/收货信息
+      setConvertForm(emptyConvertForm());
       quotesApi
         .get(fromQuote)
-        .then((q) => setQuote(q))
-        .catch((e) => toast(`加载报价失败：${e}`));
+        .then((q) => {
+          if (cancelled) return;
+          setQuote(q);
+          setConvertForm((f) => ({
+            ...f,
+            finance: {
+              materialCost: q.result.breakdown.materialCost,
+              installFee: q.result.breakdown.installFee,
+              freight: q.result.breakdown.freight,
+              actualPrice: q.result.finalPrice,
+            },
+          }));
+        })
+        .catch((e) => {
+          if (!cancelled) toast(`加载报价失败：${e}`);
+        });
     } else if (mode === 'edit' && id) {
       markLoading(); // 避免渲染上一个订单数据
       ordersApi
         .get(id)
-        .then((r) => loadFromRecord(r))
-        .catch((e) => toast(`加载订单失败：${e}`));
+        .then((r) => {
+          if (!cancelled) loadFromRecord(r);
+        })
+        .catch((e) => {
+          if (!cancelled) toast(`加载订单失败：${e}`);
+        });
     } else {
       // 手动新建：markLoading 避免闪现上一个订单的陈旧数据（此前编辑过订单时 initialized=true）
       markLoading();
       // 加载设置，带出必选配件
       settingsApi
         .get()
-        .then((s) => reset(s))
-        .catch((e) => toast(`加载设置失败：${e}`));
+        .then((s) => {
+          if (!cancelled) reset(s);
+        })
+        .catch((e) => {
+          if (!cancelled) toast(`加载设置失败：${e}`);
+        });
     }
-  }, [mode, fromQuote, id]); // eslint-disable-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, fromQuote, id]); // 依赖刻意为三元组：共同决定加载目标
 
-  // 实时财务（转单模式用报价纯材料成本+安装费，与后端 convert 口径一致：运费不计入预估成本）
+  // 实时财务（转单模式用用户在右侧确认的价格）
   const finance = useMemo(() => {
     if (mode === 'convert' && quote) {
-      const b = quote.result.breakdown;
-      return calcOrderFinance(b.materialCost, b.installFee, quote.result.finalPrice);
+      const f = convertForm.finance;
+      return calcOrderFinance(f.materialCost, f.installFee, f.freight, f.actualPrice);
     }
     // 新建模式：材料成本按材料清单实时计算（Σ 数量×单价），随清单编辑联动；编辑用已存值
     const mc =
       mode === 'create'
         ? roundMoney(form.materials.reduce((sum, m) => sum + m.quantity * m.unitPrice, 0))
         : form.materialCost;
-    return calcOrderFinance(mc, form.otherFee, form.actualPrice);
-  }, [mode, quote, form]);
+    return calcOrderFinance(mc, form.installFee, form.freight, form.actualPrice);
+  }, [mode, quote, convertForm.finance, form]);
 
   async function handleSave() {
     // 必填校验
@@ -132,11 +158,12 @@ export function OrderEditorPage() {
     setSaving(true);
     try {
       if (mode === 'convert' && fromQuote && quote) {
-        // 后端 convert：用报价的材料成本/售价创建订单，状态置 converted
+        // 后端 convert：用确认后的材料成本/安装费/运费/售价创建订单，状态置 converted
         const res = await quotesApi.convert(fromQuote, {
           customer: convertForm.customer,
           shippingAddress: convertForm.shippingAddress,
           remark: convertForm.remark,
+          finance: convertForm.finance,
         });
         toast(`已转单：${res.orderNo}`);
         justLoaded.current = true;
@@ -150,7 +177,8 @@ export function OrderEditorPage() {
           size: form.size,
           materials: form.materials,
           materialCost: form.materialCost,
-          otherFee: form.otherFee,
+          installFee: form.installFee,
+          freight: form.freight,
           actualPrice: form.actualPrice,
           remark: form.remark,
         });
@@ -167,7 +195,8 @@ export function OrderEditorPage() {
           size: form.size,
           materials: form.materials,
           materialCost,
-          otherFee: form.otherFee,
+          installFee: form.installFee,
+          freight: form.freight,
           actualPrice: form.actualPrice,
           remark: form.remark,
         });
@@ -202,21 +231,41 @@ export function OrderEditorPage() {
 
   if (!ready) return <LoadingState />;
 
-  // 统一的字段访问器（转单模式用报价纯材料成本+安装费，与后端一致）
+  // 统一的字段访问器（转单模式用右侧确认表单，创建/编辑用 store）
   const customer = mode === 'convert' ? convertForm.customer : form.customer;
   const shippingAddress = mode === 'convert' ? convertForm.shippingAddress : form.shippingAddress;
   const size: CabinetSize = mode === 'convert' ? quote!.input.size : form.size;
   const materials: AccessoryItem[] = mode === 'convert' ? quote!.input.accessories : form.materials;
-  // 材料成本：新建模式按材料清单实时计算（Σ 数量×单价）；转单用报价；编辑用手填/已存值
+  // 材料成本：新建模式按材料清单实时计算（Σ 数量×单价）；转单用确认表单；编辑用手填/已存值
   const materialCost =
     mode === 'convert'
-      ? quote!.result.breakdown.materialCost
+      ? convertForm.finance.materialCost
       : mode === 'create'
         ? roundMoney(materials.reduce((sum, m) => sum + m.quantity * m.unitPrice, 0))
         : form.materialCost;
-  const otherFee = mode === 'convert' ? quote!.result.breakdown.installFee : form.otherFee;
-  const actualPrice = mode === 'convert' ? quote!.result.finalPrice : form.actualPrice;
+  const installFee = mode === 'convert' ? convertForm.finance.installFee : form.installFee;
+  const freight = mode === 'convert' ? convertForm.finance.freight : form.freight;
+  const actualPrice = mode === 'convert' ? convertForm.finance.actualPrice : form.actualPrice;
   const remark = mode === 'convert' ? convertForm.remark : form.remark;
+
+  // M8：edit 模式材料清单可编辑，但材料成本此前用的是已存旧值——清单变更后自动按清单重算，
+  // 避免「新清单 + 旧材料成本」落库导致预估成本/利润与看板统计失真。
+  // （create 模式的成本本就在渲染时派生自清单；convert 模式清单只读，均无需处理。）
+  function recalcMaterialCost(next: AccessoryItem[]) {
+    setMaterialCost(roundMoney(next.reduce((sum, m) => sum + m.quantity * m.unitPrice, 0)));
+  }
+  function handleMaterialUpdate(index: number, patch: Partial<AccessoryItem>) {
+    updateMaterial(index, patch);
+    if (mode === 'edit') recalcMaterialCost(form.materials.map((m, i) => (i === index ? { ...m, ...patch } : m)));
+  }
+  function handleMaterialRemove(index: number) {
+    removeMaterial(index);
+    if (mode === 'edit') recalcMaterialCost(form.materials.filter((_, i) => i !== index));
+  }
+  function handleMaterialAdd(item: AccessoryItem) {
+    addMaterial(item);
+    if (mode === 'edit') recalcMaterialCost([...form.materials, item]);
+  }
 
   return (
     <div className="space-y-4">
@@ -339,7 +388,7 @@ export function OrderEditorPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => addMaterial({ name: '自定义配件', category: 'custom', quantity: 1, unitPrice: 0 })}
+                  onClick={() => handleMaterialAdd({ name: '自定义配件', category: 'custom', quantity: 1, unitPrice: 0 })}
                 >
                   <Plus className="h-3 w-3" />
                   添加
@@ -357,8 +406,8 @@ export function OrderEditorPage() {
                     key={i}
                     item={m}
                     index={i}
-                    onUpdate={updateMaterial}
-                    onRemove={removeMaterial}
+                    onUpdate={handleMaterialUpdate}
+                    onRemove={handleMaterialRemove}
                     nameEditable={mode !== 'convert'}
                   />
                 ))
@@ -378,18 +427,58 @@ export function OrderEditorPage() {
               <div className="grid grid-cols-2 gap-3">
                 {mode === 'convert' ? (
                   <>
-                    <ReadOnlyField label="材料成本" value={formatMoney(materialCost)} />
-                    <ReadOnlyField label="其他费用" value={formatMoney(otherFee)} />
-                    <ReadOnlyField label="实际售价" value={formatMoney(actualPrice)} className="col-span-2" />
+                    <NumberField
+                      label="材料成本"
+                      value={materialCost}
+                      onChange={(v) =>
+                        setConvertForm((f) => ({ ...f, finance: { ...f.finance, materialCost: v } }))
+                      }
+                      step={0.01}
+                      suffix="元"
+                    />
+                    <NumberField
+                      label="安装费"
+                      value={installFee}
+                      onChange={(v) =>
+                        setConvertForm((f) => ({ ...f, finance: { ...f.finance, installFee: v } }))
+                      }
+                      step={0.01}
+                      suffix="元"
+                    />
+                    <NumberField
+                      label="运费"
+                      value={freight}
+                      onChange={(v) =>
+                        setConvertForm((f) => ({ ...f, finance: { ...f.finance, freight: v } }))
+                      }
+                      step={0.01}
+                      suffix="元"
+                    />
+                    <NumberField
+                      label="实际售价"
+                      value={actualPrice}
+                      onChange={(v) =>
+                        setConvertForm((f) => ({ ...f, finance: { ...f.finance, actualPrice: v } }))
+                      }
+                      step={0.01}
+                      suffix="元"
+                    />
                   </>
                 ) : mode === 'create' ? (
                   <>
                     {/* 新建：材料成本按材料清单实时计算，只读 */}
                     <ReadOnlyField label="材料成本（按清单计算）" value={formatMoney(materialCost)} />
                     <NumberField
-                      label="其他费用"
-                      value={otherFee}
-                      onChange={(v) => setOtherFee(v)}
+                      label="安装费"
+                      value={installFee}
+                      onChange={(v) => setInstallFee(v)}
+                      step={0.01}
+                      suffix="元"
+                    />
+                    <NumberField
+                      label="运费"
+                      value={freight}
+                      onChange={(v) => setFreight(v)}
                       step={0.01}
                       suffix="元"
                     />
@@ -399,7 +488,6 @@ export function OrderEditorPage() {
                       onChange={(v) => setActualPrice(v)}
                       step={0.01}
                       suffix="元"
-                      className="col-span-2"
                     />
                   </>
                 ) : (
@@ -410,11 +498,19 @@ export function OrderEditorPage() {
                       onChange={(v) => setMaterialCost(v)}
                       step={0.01}
                       suffix="元"
+                      helper="修改材料清单后将自动按清单重算"
                     />
                     <NumberField
-                      label="其他费用"
-                      value={otherFee}
-                      onChange={(v) => setOtherFee(v)}
+                      label="安装费"
+                      value={installFee}
+                      onChange={(v) => setInstallFee(v)}
+                      step={0.01}
+                      suffix="元"
+                    />
+                    <NumberField
+                      label="运费"
+                      value={freight}
+                      onChange={(v) => setFreight(v)}
                       step={0.01}
                       suffix="元"
                     />
@@ -424,13 +520,14 @@ export function OrderEditorPage() {
                       onChange={(v) => setActualPrice(v)}
                       step={0.01}
                       suffix="元"
-                      className="col-span-2"
                     />
                   </>
                 )}
               </div>
               {mode === 'convert' && (
-                <div className="text-xs text-muted-foreground">财务数据来自报价，转单后可在订单编辑页修改</div>
+                <div className="text-xs text-muted-foreground">
+                  请逐项确认材料成本、安装费、运费与实际售价，确认后提交转单。
+                </div>
               )}
 
               <div className="space-y-2 rounded-lg bg-muted/50 p-4">

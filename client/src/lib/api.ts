@@ -24,9 +24,18 @@ export interface OrderCreateBody {
   size: CabinetSize;
   materials: AccessoryItem[];
   materialCost: number;
-  otherFee?: number;
+  installFee?: number;
+  freight?: number;
   actualPrice: number;
   remark?: string;
+}
+
+/** 报价转订单时确认的财务数据 */
+export interface QuoteConvertFinance {
+  materialCost: number;
+  installFee: number;
+  freight: number;
+  actualPrice: number;
 }
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
@@ -37,9 +46,11 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
   });
   // 受保护 API 401（会话过期/失效）：整页跳登录并清前端状态。
-  // 仅排除 /api/auth/login 与 /api/auth/setup 的 401（错密码/错 token 要内联报错，不跳转）；
-  // /api/auth/password 是受保护端点（gate 之后），会话过期应与其他受保护端点一致跳登录。
-  const isAuthBypass = url === '/api/auth/login' || url === '/api/auth/setup';
+  // 仅排除 /api/auth/login、/api/auth/setup（错密码/错 token 要内联报错，不跳转）
+  // 与 /api/auth/status（状态查询本身不应触发刷新循环——若未来 status 异常返回 401，
+  // 整页 assign('/login') 会形成「status→刷新→status」死循环）。
+  const isAuthBypass =
+    url === '/api/auth/login' || url === '/api/auth/setup' || url === '/api/auth/status';
   if (res.status === 401 && !isAuthBypass) {
     window.location.assign('/login');
     throw new Error('未登录');
@@ -64,7 +75,7 @@ export const quotesApi = {
       body: JSON.stringify(input),
     }),
   remove: (id: string) => request<void>(`/api/quotes/${id}`, { method: 'DELETE' }),
-  convert: (id: string, body: { customer: { name: string; platformOrderNo: string }; shippingAddress: { receiver: string; phone: string; address: string }; remark?: string }) =>
+  convert: (id: string, body: { customer: { name: string; platformOrderNo: string }; shippingAddress: { receiver: string; phone: string; address: string }; remark?: string; finance?: QuoteConvertFinance }) =>
     request<{ orderId: string; orderNo: string }>(`/api/quotes/${id}/convert`, {
       method: 'POST',
       body: JSON.stringify(body),
@@ -117,6 +128,11 @@ export const statsApi = {
 export const backupApi = {
   export: async (): Promise<Blob> => {
     const res = await fetch('/api/backup', { credentials: 'include' });
+    if (res.status === 401) {
+      // L8：与统一 request() 的 401 行为对齐——会话失效时跳登录，而非误报「导出失败」
+      window.location.assign('/login');
+      throw new Error('未登录');
+    }
     if (!res.ok) throw new Error('导出失败');
     return res.blob();
   },
@@ -124,6 +140,10 @@ export const backupApi = {
     const form = new FormData();
     form.append('file', file);
     const res = await fetch('/api/backup/restore', { method: 'POST', body: form, credentials: 'include' });
+    if (res.status === 401) {
+      window.location.assign('/login');
+      throw new Error('未登录');
+    }
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: res.statusText }));
       throw new Error(err.error || '恢复失败');

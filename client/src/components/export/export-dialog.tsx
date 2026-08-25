@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { QuoteSheet } from '@/components/export/quote-sheet';
 import { ProductionSheet } from '@/components/export/production-sheet';
+import { PAGE_WIDTH } from './sheet-theme';
 import { useToast } from '@/components/toaster';
 import { exportNodeAsPng, exportNodeAsPdf, exportQuoteExcel } from '@/lib/export';
 import type { QuoteRecord } from '@idlefish/shared';
@@ -85,16 +86,16 @@ export function ExportDialog({ open, onClose, quote }: ExportDialogProps) {
           </Button>
         </div>
 
-        {/* 预览：800px 固定宽度（导出精度），容器溢出可滚 */}
+        {/* 预览：导出精度固定宽度，容器溢出可滚 */}
         <div className="max-h-[60vh] overflow-auto rounded-md border bg-muted/50 p-4">
-          <div ref={nodeRef} className="mx-auto" style={{ width: 800 }}>
+          <div ref={nodeRef} className="mx-auto" style={{ width: PAGE_WIDTH }}>
             {type === 'quote' ? <QuoteSheet quote={quote} /> : <ProductionSheet quote={quote} />}
           </div>
         </div>
 
         {/* 导出按钮 */}
         <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="outline" onClick={handleExcel}>
+          <Button variant="outline" onClick={handleExcel} disabled={busy}>
             <FileSpreadsheet className="h-4 w-4" />
             Excel 明细
           </Button>

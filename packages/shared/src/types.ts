@@ -207,7 +207,11 @@ export interface ShippingAddress {
 export interface OrderFinance {
   /** 材料成本（元，从报价带入或手填） */
   materialCost: number;
-  /** 其他费用（元） */
+  /** 安装费（元） */
+  installFee: number;
+  /** 运费（元，预估，发货时会被实际运费替换） */
+  freight: number;
+  /** 其他费用（元）= 安装费 + 运费，保留旧字段兼容历史数据 */
   otherFee: number;
   /** 预估成本（元）= 材料成本 + 其他费用 */
   estimatedCost: number;
@@ -231,7 +235,7 @@ export interface ShippingInfo {
   checkRemark: string;
   /** 确认发货时间 */
   confirmedAt: string;
-  /** 实际成本（元）= 预估成本 + 实际运费 */
+  /** 实际成本（元）= 材料成本 + 安装费 + 实际运费（实际运费替换下单时的预估运费，不叠加） */
   actualCost: number;
   /** 实际利润（元）= 实际售价 − 实际成本 */
   actualProfit: number;

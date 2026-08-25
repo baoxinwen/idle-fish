@@ -19,6 +19,9 @@ interface AccessoryRowProps {
  * 配件表格行：PC 与父容器表头列对齐（无内部 label）+ 行分隔线；
  * 移动端保留 label 并换行。
  */
+/** M10/F-03：输入收敛统一走 lib/input-sanitize，杜绝 Infinity 与负单价流入实时计价 */
+import { toCount, toPrice } from '@/lib/input-sanitize';
+
 export function AccessoryRow({ item, index, onUpdate, onRemove, nameEditable, showRemove = true }: AccessoryRowProps) {
   const subtotal = item.quantity * item.unitPrice;
 
@@ -45,7 +48,7 @@ export function AccessoryRow({ item, index, onUpdate, onRemove, nameEditable, sh
           min={0}
           step={1}
           value={item.quantity}
-          onChange={(e) => onUpdate(index, { quantity: Number(e.target.value) || 0 })}
+          onChange={(e) => onUpdate(index, { quantity: toCount(e.target.value) })}
           className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular"
         />
       </div>
@@ -57,7 +60,7 @@ export function AccessoryRow({ item, index, onUpdate, onRemove, nameEditable, sh
           min={0}
           step={0.01}
           value={item.unitPrice}
-          onChange={(e) => onUpdate(index, { unitPrice: Number(e.target.value) || 0 })}
+          onChange={(e) => onUpdate(index, { unitPrice: toPrice(e.target.value) })}
           className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular"
         />
       </div>

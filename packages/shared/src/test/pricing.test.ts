@@ -185,7 +185,10 @@ describe('calcQuote', () => {
 
 describe('calcOrderFinance', () => {
   it('预估成本/利润/毛利率', () => {
-    const f = calcOrderFinance(249.41, 50, 400);
+    const f = calcOrderFinance(249.41, 30, 20, 400);
+    assert.equal(f.installFee, 30);
+    assert.equal(f.freight, 20);
+    assert.equal(f.otherFee, 50);
     assert.equal(f.estimatedCost, 299.41);
     assert.equal(f.estimatedProfit, 100.59);
     assert.equal(f.estimatedProfitRatePct, 25.15); // 100.59/400×100
@@ -193,10 +196,10 @@ describe('calcOrderFinance', () => {
 });
 
 describe('calcActualFinance', () => {
-  it('实际成本 = 预估成本 + 实际运费', () => {
-    const f = calcActualFinance(299.41, 400, 45);
-    assert.equal(f.actualCost, 344.41);
-    assert.equal(f.actualProfit, 55.59);
+  it('实际成本 = 材料成本 + 安装费 + 实际运费', () => {
+    const f = calcActualFinance(249.41, 30, 400, 45);
+    assert.equal(f.actualCost, 324.41);
+    assert.equal(f.actualProfit, 75.59);
   });
 });
 

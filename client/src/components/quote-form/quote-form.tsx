@@ -81,30 +81,42 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
           {/* 费用计入 */}
           <div className="space-y-2 border-t pt-3">
             <Label className="text-xs text-muted-foreground">费用计入</Label>
-            <label className="flex cursor-pointer items-center justify-between rounded-md border px-3 py-2 text-sm">
-              <span>
+            <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm">
+              <div className="flex flex-1 items-center justify-between gap-3">
                 <span className="font-medium">运费</span>
-                <span className="ml-2 text-xs text-muted-foreground tabular">¥{input.pricing.freight.toFixed(2)}</span>
-              </span>
+                <NumberField
+                  value={input.pricing.freight}
+                  onChange={(v) => setPricing({ freight: v })}
+                  step={0.01}
+                  suffix="元"
+                  className="w-32"
+                />
+              </div>
               <input
                 type="checkbox"
                 checked={input.freightEnabled}
                 onChange={(e) => toggleFreight(e.target.checked)}
                 className="h-4 w-4 rounded border-input"
               />
-            </label>
-            <label className="flex cursor-pointer items-center justify-between rounded-md border px-3 py-2 text-sm">
-              <span>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm">
+              <div className="flex flex-1 items-center justify-between gap-3">
                 <span className="font-medium">安装费</span>
-                <span className="ml-2 text-xs text-muted-foreground tabular">¥{input.pricing.installFee.toFixed(2)}</span>
-              </span>
+                <NumberField
+                  value={input.pricing.installFee}
+                  onChange={(v) => setPricing({ installFee: v })}
+                  step={0.01}
+                  suffix="元"
+                  className="w-32"
+                />
+              </div>
               <input
                 type="checkbox"
                 checked={input.installEnabled}
                 onChange={(e) => toggleInstall(e.target.checked)}
                 className="h-4 w-4 rounded border-input"
               />
-            </label>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -234,8 +246,9 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
                 <ParamRow label="安装费" unit="元" value={input.pricing.installFee} onChange={(v) => setPricing({ installFee: v })} />
                 <ParamRow label="运费" unit="元" value={input.pricing.freight} onChange={(v) => setPricing({ freight: v })} />
                 <div className="label-mono mb-1 mt-3 border-b border-border pb-1 text-[10px] text-muted-foreground/70">托盘</div>
-                <ParamRow label="托盘系数 A" unit="" value={input.pricing.trayCoeffA} onChange={(v) => setPricing({ trayCoeffA: v })} />
-                <ParamRow label="托盘系数 B" unit="" value={input.pricing.trayCoeffB} onChange={(v) => setPricing({ trayCoeffB: v })} />
+                {/* F-02：托盘系数允许负值（与设置页/shared schema 口径一致），必须传 unclamped */}
+                <ParamRow label="托盘系数 A" unit="" value={input.pricing.trayCoeffA} onChange={(v) => setPricing({ trayCoeffA: v })} unclamped />
+                <ParamRow label="托盘系数 B" unit="" value={input.pricing.trayCoeffB} onChange={(v) => setPricing({ trayCoeffB: v })} unclamped />
               </div>
             </div>
           </CardContent>

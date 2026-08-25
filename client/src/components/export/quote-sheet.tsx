@@ -6,7 +6,11 @@
 
 import { forwardRef, Fragment } from 'react';
 import { ThreeViews } from './three-views';
-import { C, MONO, SANS } from './sheet-theme';
+import { C, MONO, SANS, PAGE_WIDTH } from './sheet-theme';
+
+/** 卖家信息（F-15）：图签栏与 footer 共用，单点维护 */
+const SELLER_NAME = '@包黑蛋';
+const SELLER_CONTACT = '15249983529';
 import type { QuoteRecord } from '@idlefish/shared';
 import { formatMoney, localDate } from '@/lib/utils';
 import { COLOR_LABEL } from '@/lib/status';
@@ -23,7 +27,7 @@ const PX = 52;
 
 const S = {
   page: {
-    width: 800,
+    width: PAGE_WIDTH,
     background: C.paper,
     color: C.ink,
     fontFamily: SANS,
@@ -311,14 +315,15 @@ export const QuoteSheet = forwardRef<HTMLDivElement, QuoteSheetProps>(({ quote }
       <div style={S.summary}>
         <div style={S.summaryCell}>
           <div style={S.summaryLabel}>运费</div>
+          {/* M1：客户报价图只显示总价——费用项仅显示「已含/未含」状态，不泄露金额 */}
           <div style={freightIncluded ? S.summaryValueGold : S.summaryValue}>
-            {freightIncluded ? `已含 ${formatMoney(b.freight)}` : '未含'}
+            {freightIncluded ? '已含' : '未含'}
           </div>
         </div>
         <div style={S.summaryCell}>
           <div style={S.summaryLabel}>安装费</div>
           <div style={installIncluded ? S.summaryValueGold : S.summaryValue}>
-            {installIncluded ? `已含 ${formatMoney(b.installFee)}` : '未含'}
+            {installIncluded ? '已含' : '未含'}
           </div>
         </div>
         <div style={S.summaryCellLast}>
@@ -385,7 +390,7 @@ export const QuoteSheet = forwardRef<HTMLDivElement, QuoteSheetProps>(({ quote }
       </div>
 
       <div style={S.footer}>
-        <span>卖家 @包黑蛋 · 15249983529</span>
+        <span>卖家 {SELLER_NAME} · {SELLER_CONTACT}</span>
         <span>本报价单由系统生成</span>
       </div>
     </div>

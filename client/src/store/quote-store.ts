@@ -5,7 +5,6 @@
 
 import { create } from 'zustand';
 import {
-  type AccessoryCategory,
   type AccessoryItem,
   type PricingParams,
   type ProfileColor,
@@ -31,6 +30,10 @@ interface QuoteStoreState {
   reset: (settings: Settings) => void;
   /** 标记正在加载（路由切换时设 initialized=false，让 LoadingState 接管） */
   markLoading: () => void;
+  /** 丢弃当前编辑态（M5：blocker「放弃修改」导航前调用）——
+   *  清掉 editingId/initialized，下次进入同一报价时跳过分支不再命中，强制重新从服务端加载，
+   *  避免复活刚被放弃的脏数据 */
+  invalidateEditing: () => void;
 
   // 尺寸
   setSize: (field: 'width' | 'depth' | 'height', value: number) => void;
@@ -71,7 +74,7 @@ const DEFAULT_INPUT: QuoteInput = {
 function inputFromSettings(settings: Settings): QuoteInput {
   const accessories: AccessoryItem[] = settings.defaultAccessories.map((a) => ({
     name: a.name,
-    category: a.category as AccessoryCategory,
+    category: a.category,
     quantity: a.defaultQuantity,
     unitPrice: a.defaultUnitPrice,
   }));
@@ -136,6 +139,9 @@ export const useQuoteStore = create<QuoteStoreState>((set) => ({
   reset: (settings) => set({ input: inputFromSettings(settings), editingId: null, editingStatus: null, initialized: true }),
 
   markLoading: () => set({ initialized: false }),
+
+  invalidateEditing: () =>
+    set({ editingId: null, editingStatus: null, initialized: false }),
 
   setSize: (field, value) =>
     set((s) => ({ input: { ...s.input, size: { ...s.input.size, [field]: value } } })),

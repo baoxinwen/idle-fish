@@ -6,7 +6,6 @@
 
 import { create } from 'zustand';
 import {
-  calcOrderFinance,
   DEFAULT_SETTINGS,
   type AccessoryItem,
   type CabinetSize,
@@ -23,7 +22,8 @@ export interface OrderFormState {
   size: CabinetSize;
   materials: AccessoryItem[];
   materialCost: number;
-  otherFee: number;
+  installFee: number;
+  freight: number;
   actualPrice: number;
   remark: string;
 }
@@ -34,7 +34,8 @@ const EMPTY_FORM: OrderFormState = {
   size: { ...DEFAULT_SETTINGS.defaultSize },
   materials: [],
   materialCost: 0,
-  otherFee: 0,
+  installFee: 0,
+  freight: 0,
   actualPrice: 0,
   remark: '',
 };
@@ -53,18 +54,16 @@ interface OrderStoreState {
   setShippingAddress: (patch: Partial<ShippingAddress>) => void;
   setSize: (field: keyof CabinetSize, value: number) => void;
   setMaterialCost: (v: number) => void;
-  setOtherFee: (v: number) => void;
+  setInstallFee: (v: number) => void;
+  setFreight: (v: number) => void;
   setActualPrice: (v: number) => void;
   setRemark: (v: string) => void;
   updateMaterial: (index: number, patch: Partial<AccessoryItem>) => void;
   addMaterial: (item: AccessoryItem) => void;
   removeMaterial: (index: number) => void;
-
-  /** 实时财务（预估） */
-  computeFinance: () => ReturnType<typeof calcOrderFinance>;
 }
 
-export const useOrderStore = create<OrderStoreState>((set, get) => ({
+export const useOrderStore = create<OrderStoreState>((set) => ({
   form: EMPTY_FORM,
   editingId: null,
   initialized: false,
@@ -77,7 +76,8 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
         size: { ...record.size },
         materials: record.materials.map((m) => ({ ...m })),
         materialCost: record.finance.materialCost,
-        otherFee: record.finance.otherFee,
+        installFee: record.finance.installFee ?? record.finance.otherFee ?? 0,
+        freight: record.finance.freight ?? 0,
         actualPrice: record.finance.actualPrice,
         remark: record.remark,
       },
@@ -125,7 +125,8 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
     set((s) => ({ form: { ...s.form, size: { ...s.form.size, [field]: value } } })),
 
   setMaterialCost: (materialCost) => set((s) => ({ form: { ...s.form, materialCost } })),
-  setOtherFee: (otherFee) => set((s) => ({ form: { ...s.form, otherFee } })),
+  setInstallFee: (installFee) => set((s) => ({ form: { ...s.form, installFee } })),
+  setFreight: (freight) => set((s) => ({ form: { ...s.form, freight } })),
   setActualPrice: (actualPrice) => set((s) => ({ form: { ...s.form, actualPrice } })),
   setRemark: (remark) => set((s) => ({ form: { ...s.form, remark } })),
 
@@ -144,9 +145,4 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
     set((s) => ({
       form: { ...s.form, materials: s.form.materials.filter((_, i) => i !== index) },
     })),
-
-  computeFinance: () => {
-    const f = get().form;
-    return calcOrderFinance(f.materialCost, f.otherFee, f.actualPrice);
-  },
 }));

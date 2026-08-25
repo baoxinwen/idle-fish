@@ -2,7 +2,7 @@
  * 订单详情页：完整信息展示 + 状态流转步骤条 + 发货核对。
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Pencil, Truck, XCircle, CheckCircle2, Factory, PackageCheck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,16 +41,8 @@ const ACTIONS: Partial<
   cancelled: [],
 };
 
-/** 状态流转步骤（取消态单独处理） */
+/** 状态流转步骤（取消态单独处理）。标签复用 lib/status 的 ORDER_STATUS_LABEL（F-08 去重） */
 const FLOW: OrderStatus[] = ['pending', 'producing', 'ready', 'shipped', 'done'];
-const FLOW_LABEL: Record<OrderStatus, string> = {
-  pending: '待生产',
-  producing: '生产中',
-  ready: '待发货',
-  shipped: '已发货',
-  done: '已完成',
-  cancelled: '已取消',
-};
 
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -61,20 +53,26 @@ export function OrderDetailPage() {
   const [shipOpen, setShipOpen] = useState(false);
   const [shipForm, setShipForm] = useState({ courier: '', trackingNo: '', actualFreight: 0, checkRemark: '' });
 
+  // M7：竞态守卫——路由复用同一元素切换 id 时，丢弃迟到响应，避免 A 的数据覆盖 B
+  const reqSeq = useRef(0);
+
   useEffect(() => {
     if (id) refresh();
   }, [id]);
 
   async function refresh() {
     if (!id) return;
+    const seq = ++reqSeq.current;
     setLoading(true);
     try {
       const r = await ordersApi.get(id);
+      if (seq !== reqSeq.current) return;
       setRecord(r);
     } catch (e) {
+      if (seq !== reqSeq.current) return;
       toast(`加载失败：${e}`);
     } finally {
-      setLoading(false);
+      if (seq === reqSeq.current) setLoading(false);
     }
   }
 
@@ -174,7 +172,7 @@ export function OrderDetailPage() {
                           {done ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
                         </div>
                         <span className={cn('text-[10px] whitespace-nowrap', active ? 'font-medium text-foreground' : 'text-muted-foreground')}>
-                          {FLOW_LABEL[s]}
+                          {ORDER_STATUS_LABEL[s]}
                         </span>
                       </div>
                       {i < FLOW.length - 1 && (
@@ -190,8 +188,8 @@ export function OrderDetailPage() {
                   {currentStep + 1}
                 </div>
                 <div className="min-w-0">
-                  <div className="text-sm font-medium">{FLOW_LABEL[record.status]}</div>
-                  <div className="text-xs text-muted-foreground">第 {currentStep + 1}/{FLOW.length} 步 · {FLOW_LABEL[FLOW[currentStep + 1] ?? FLOW[currentStep]]}</div>
+                  <div className="text-sm font-medium">{ORDER_STATUS_LABEL[record.status]}</div>
+                  <div className="text-xs text-muted-foreground">第 {currentStep + 1}/{FLOW.length} 步 · {ORDER_STATUS_LABEL[FLOW[currentStep + 1] ?? FLOW[currentStep]]}</div>
                 </div>
                 {/* 进度条 */}
                 <div className="ml-auto h-1.5 w-24 overflow-hidden rounded-full bg-secondary">
@@ -271,7 +269,8 @@ export function OrderDetailPage() {
           <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">财务（预估）</CardTitle></CardHeader>
           <CardContent className="space-y-2 pl-4 text-sm">
             <InfoRow label="材料成本" value={formatMoney(record.finance.materialCost)} />
-            <InfoRow label="其他费用" value={formatMoney(record.finance.otherFee)} />
+            <InfoRow label="安装费" value={formatMoney(record.finance.installFee)} />
+            <InfoRow label="运费" value={formatMoney(record.finance.freight)} />
             <InfoRow label="预估成本" value={formatMoney(record.finance.estimatedCost)} />
             <InfoRow label="实际售价" value={formatMoney(record.finance.actualPrice)} bold />
             <InfoRow

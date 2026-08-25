@@ -3,7 +3,7 @@
  * PC：表格（整行点击进详情）；移动端：卡片列表。
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Download, Trash2, FileText, ChevronRight } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -31,20 +31,25 @@ export function QuoteListPage() {
   const [filter, setFilter] = useState<'all' | QuoteStatus>('all');
   const [loading, setLoading] = useState(true);
   const [exportQuote, setExportQuote] = useState<QuoteRecord | null>(null);
+  // M7：竞态守卫——快速切换筛选时丢弃迟到响应，避免旧筛选结果覆盖新列表
+  const reqSeq = useRef(0);
 
   useEffect(() => {
     refresh();
-  }, [filter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filter]); // 依赖刻意为 filter：筛选变化即重查
 
   async function refresh() {
+    const seq = ++reqSeq.current;
     setLoading(true);
     try {
       const list = await quotesApi.list(filter === 'all' ? undefined : filter);
+      if (seq !== reqSeq.current) return;
       setRecords(list);
     } catch (e) {
+      if (seq !== reqSeq.current) return;
       toast(`加载失败：${e}`);
     } finally {
-      setLoading(false);
+      if (seq === reqSeq.current) setLoading(false);
     }
   }
 

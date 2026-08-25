@@ -5,11 +5,22 @@
 import { Router } from 'express';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
-import { calcQuote, calcOrderFinance, quoteInputSchema, type QuoteInput, type QuoteRecord } from '@idlefish/shared';
+import {
+  calcQuote,
+  calcOrderFinance,
+  money,
+  quoteInputSchema,
+  customerInfoSchema,
+  shippingAddressSchema,
+  type AccessoryItem,
+  type QuoteInput,
+  type QuoteRecord,
+} from '@idlefish/shared';
 import { getDb } from '../db/index.js';
 import { nextBusinessNo, nowIso } from '../lib/no.js';
 import { insertOrder } from '../lib/insert-order.js';
 import { log } from '../lib/logger.js';
+import { HttpError, sendTxError } from '../lib/http-error.js';
 
 export const quotesRouter = Router();
 
@@ -69,6 +80,7 @@ quotesRouter.post('/', (req, res) => {
     return quoteNo;
   });
   const quoteNo = tx();
+  log.info('quote', '创建报价', { quoteNo, id, ip: req.ip });
 
   const record: QuoteRecord = {
     id,
@@ -101,15 +113,53 @@ quotesRouter.put('/:id', (req, res) => {
   if (info.changes === 0) {
     return res.status(404).json({ error: '报价不存在或已转为订单，不可编辑' });
   }
+  log.info('quote', '编辑报价', { id: req.params.id, ip: req.ip });
   res.json({ id: req.params.id, input, result, updatedAt: now });
 });
 
-// 删除
+// 删除（L6：已转单报价不可删——外键 ON DELETE SET NULL 会让关联订单失去来源）
 quotesRouter.delete('/:id', (req, res) => {
-  const info = getDb().prepare('DELETE FROM quotes WHERE id = ?').run(req.params.id);
-  if (info.changes === 0) return res.status(404).json({ error: '报价不存在' });
+  const db = getDb();
+  const row = db.prepare('SELECT status FROM quotes WHERE id = ?').get(req.params.id) as
+    | { status: string }
+    | undefined;
+  if (!row) return res.status(404).json({ error: '报价不存在' });
+  if (row.status === 'converted') {
+    return res.status(409).json({ error: '该报价已转为订单，不可删除' });
+  }
+  db.prepare('DELETE FROM quotes WHERE id = ?').run(req.params.id);
+  log.info('quote', '删除报价', { id: req.params.id, status: row.status, ip: req.ip });
   res.status(204).end();
 });
+
+/** S-3：转单请求 schema——模块常量（避免每请求重建），客户/收货复用 shared schema
+ *  以继承长度上限（此前手写子集丢失了 max 校验），金额字段复用 shared 的 money()。 */
+const convertBodySchema = z.object({
+  customer: customerInfoSchema,
+  shippingAddress: shippingAddressSchema,
+  remark: z.string().max(1000).optional().default(''),
+  finance: z
+    .object({
+      materialCost: money(),
+      installFee: money(),
+      freight: money(),
+      actualPrice: money(),
+    })
+    .optional(),
+});
+
+/** S-5：legacy 报价（托盘走 trayCount 字段、配件里无 tray 项）补一条虚拟托盘材料行——
+ *  否则引擎用 legacyTrayCost 把托盘钱计入材料成本，而订单材料清单缺托盘行，车间少备货。 */
+function withLegacyTray(input: QuoteInput): AccessoryItem[] {
+  const materials = input.accessories;
+  if (materials.some((a) => a.category === 'tray') || !(input.trayCount > 0)) {
+    return materials;
+  }
+  return [
+    ...materials,
+    { name: '托盘', category: 'tray' as const, quantity: input.trayCount, unitPrice: input.trayUnitPrice ?? 0 },
+  ];
+}
 
 // 转为订单
 quotesRouter.post('/:id/convert', (req, res) => {
@@ -120,19 +170,16 @@ quotesRouter.post('/:id/convert', (req, res) => {
     | undefined;
   if (!row) return res.status(404).json({ error: '报价不存在' });
 
-  const body = z
-    .object({
-      customer: z.object({ name: z.string().min(1), platformOrderNo: z.string() }),
-      shippingAddress: z.object({ receiver: z.string(), phone: z.string(), address: z.string() }),
-      remark: z.string().optional().default(''),
-    })
-    .safeParse(req.body);
+  const body = convertBodySchema.safeParse(req.body);
   if (!body.success) {
     return res.status(400).json({ error: '参数校验失败', detail: body.error.flatten() });
   }
 
   let input: QuoteInput;
-  let result: { breakdown: { materialCost: number; installFee: number }; finalPrice: number };
+  let result: {
+    breakdown: { materialCost: number; installFee: number; freight: number };
+    finalPrice: number;
+  };
   try {
     input = JSON.parse(row.input) as QuoteInput;
     result = JSON.parse(row.result);
@@ -151,20 +198,30 @@ quotesRouter.post('/:id/convert', (req, res) => {
       .prepare("UPDATE quotes SET status = 'converted', updated_at = ? WHERE id = ? AND status != 'converted'")
       .run(now, row.id);
     if (upd.changes === 0) {
-      throw new Error('该报价已转为订单');
+      throw new HttpError(400, '该报价已转为订单');
     }
     const orderNo = nextBusinessNo(db, 'O', 'orders', 'order_no');
-    // 订单财务：materialCost 用报价纯材料成本（不含运费），otherFee 放安装费。
-    // 运费不计入预估成本——发货时才作为 actualFreight 计入 actualCost。
-    // 这样与手动新建订单路径（calcOrderFinance）语义一致，避免运费重复计算。
-    const orderMaterialCost = result.breakdown.materialCost;
-    const orderOtherFee = result.breakdown.installFee; // 已勾选则为安装费，未勾选为 0
-    const finance = {
-      materialCost: orderMaterialCost,
-      otherFee: orderOtherFee,
+    // 订单财务：使用转单页确认后的材料成本、安装费、运费和实际售价。
+    // 若调用方未传 finance，则回退为报价计算结果，保持旧接口兼容。
+    const confirmedFinance = body.data.finance ?? {
+      materialCost: result.breakdown.materialCost,
+      installFee: result.breakdown.installFee,
+      freight: result.breakdown.freight,
       actualPrice: result.finalPrice,
-      ...calcOrderFinance(orderMaterialCost, orderOtherFee, result.finalPrice),
     };
+    const finance = {
+      ...calcOrderFinance(
+        confirmedFinance.materialCost,
+        confirmedFinance.installFee,
+        confirmedFinance.freight,
+        confirmedFinance.actualPrice,
+      ),
+      materialCost: confirmedFinance.materialCost,
+      installFee: confirmedFinance.installFee,
+      freight: confirmedFinance.freight,
+      actualPrice: confirmedFinance.actualPrice,
+    };
+    const materials = withLegacyTray(input);
     insertOrder(db, {
       id: orderId,
       orderNo,
@@ -172,7 +229,7 @@ quotesRouter.post('/:id/convert', (req, res) => {
       customer: body.data.customer,
       shippingAddress: body.data.shippingAddress,
       size: input.size,
-      materials: input.accessories,
+      materials,
       finance,
       remark: body.data.remark,
       now,
@@ -184,7 +241,12 @@ quotesRouter.post('/:id/convert', (req, res) => {
     log.info('quote', '转单成功', { quoteNo: row.quote_no, orderNo, ip: req.ip });
     res.status(201).json({ orderId, orderNo });
   } catch (e) {
-    res.status(400).json({ error: e instanceof Error ? e.message : '转单失败' });
+    // L4：业务错误（HttpError）返回具体 message；其余（SQL 约束等基础设施错误）
+    // 一律 500 泛化文案，不向客户端泄露内部细节
+    if (!(e instanceof HttpError)) {
+      log.error('quote', `转单失败: ${e instanceof Error ? e.message : String(e)}`, { ip: req.ip });
+    }
+    sendTxError(res, e, '转单失败');
   }
 });
 

@@ -2,7 +2,7 @@
  * 状态标签映射 — 中文文案 + Badge 颜色。
  */
 
-import type { OrderStatus, QuoteStatus } from '@idlefish/shared';
+import type { AccessoryCategory, OrderStatus, ProfileColor, QuoteStatus } from '@idlefish/shared';
 import type { BadgeProps } from '@/components/ui/badge';
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
@@ -35,12 +35,13 @@ export const QUOTE_STATUS_BADGE: Record<QuoteStatus, BadgeProps['variant']> = {
   converted: 'success',
 };
 
-export const COLOR_LABEL: Record<'silver' | 'black', string> = {
+// F-09：键类型直接引用 shared 联合类型——shared 新增枚举值时此处立刻编译报错而非静默漂移
+export const COLOR_LABEL: Record<ProfileColor, string> = {
   silver: '银色',
   black: '黑色',
 };
 
-export const CATEGORY_LABEL: Record<string, string> = {
+export const CATEGORY_LABEL: Record<AccessoryCategory, string> = {
   connector: '连接件',
   fastener: '紧固件',
   blindplate: '盲板',
