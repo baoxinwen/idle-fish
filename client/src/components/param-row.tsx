@@ -13,6 +13,8 @@ interface ParamRowProps {
   value: number;
   onChange: (v: number) => void;
   emptyValue?: number;
+  /** 非聚焦态小数位格式化（金额类传 2） */
+  displayDecimals?: number;
   /** 毛利率（百分制显示，存小数） */
   percent?: boolean;
   /** 损耗率（百分制显示，存乘数） */
@@ -21,7 +23,7 @@ interface ParamRowProps {
   unclamped?: boolean;
 }
 
-export function ParamRow({ label, unit, value, onChange, emptyValue, percent, wastage, unclamped }: ParamRowProps) {
+export function ParamRow({ label, unit, value, onChange, emptyValue, displayDecimals, percent, wastage, unclamped }: ParamRowProps) {
   return (
     <div className="flex items-center gap-3 border-b border-border/60 py-2 last:border-0">
       <span className="w-24 shrink-0 text-sm text-muted-foreground sm:w-28">{label}</span>
@@ -36,6 +38,7 @@ export function ParamRow({ label, unit, value, onChange, emptyValue, percent, wa
           onChange={onChange}
           step={0.01}
           emptyValue={emptyValue}
+          displayDecimals={displayDecimals}
           unclamped={unclamped}
           className="flex-1"
         />

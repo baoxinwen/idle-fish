@@ -2,7 +2,6 @@
  * Modal 封装：底层用 vaul（Emil Kowalski）。
  * 移动端：底部抽屉 + 拖拽关闭 + 橡皮筋物理。
  * PC：居中卡片 + spring 缩放进出。
- * 保持原 Modal props 接口，调用点零改动。
  */
 
 import * as React from 'react';
@@ -10,15 +9,28 @@ import { Drawer } from 'vaul';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
+
+// 宽度经 size prop 控制。此前把 sm:max-w-md 写死在基类里，调用方传 max-w-4xl
+// 属不同 variant 组、会被响应式类在 CSS 序上压过（导出弹窗因此一直卡在 md 宽），故收口于此。
+const SIZE: Record<ModalSize, string> = {
+  sm: 'sm:max-w-sm',
+  md: 'sm:max-w-md',
+  lg: 'sm:max-w-3xl',
+  xl: 'sm:max-w-5xl',
+};
+
 interface ModalProps {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  /** PC 端内容宽度档位，默认 md */
+  size?: ModalSize;
   className?: string;
 }
 
-export function Modal({ open, onClose, title, children, className }: ModalProps) {
+export function Modal({ open, onClose, title, children, size = 'md', className }: ModalProps) {
   return (
     <Drawer.Root open={open} onOpenChange={(o) => !o && onClose()} direction="bottom">
       <Drawer.Portal>
@@ -29,7 +41,8 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
             // [&_::after]:hidden 去掉 vaul 内置的 ::after 伪元素（PC 居中时会产生白块）
             'fixed inset-x-0 bottom-0 z-50 flex max-h-[90vh] flex-col overflow-hidden rounded-t-xl border bg-card shadow-xl outline-none [&_::after]:hidden',
             // PC：inset-0 + margin auto 居中（不用 transform，避免与 vaul 动画的 inline transform 冲突）
-            'sm:inset-0 sm:m-auto sm:h-fit sm:w-full sm:max-w-md sm:rounded-xl',
+            'sm:inset-0 sm:m-auto sm:h-fit sm:w-full sm:rounded-xl',
+            SIZE[size],
             className,
           )}
         >
