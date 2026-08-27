@@ -108,6 +108,12 @@ export const settingsSchema = z.object({
   /** 默认托盘单价（托盘作为配件的默认单价） */
   defaultTrayUnitPrice: money().default(0),
   defaultPricing: pricingParamsSchema,
+  /** 品牌/卖家信息：导出报价单、生产单抬头使用。default 兜底旧数据（存量 settings 行无此字段） */
+  brand: z
+    .object({
+      sellerName: z.string().min(1).max(50),
+    })
+    .default({ sellerName: '@包黑蛋' }),
   defaultAccessories: z.array(
     z.object({
       name: z.string().min(1).max(100),

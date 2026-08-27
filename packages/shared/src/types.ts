@@ -283,6 +283,12 @@ export interface DefaultAccessoryConfig {
   defaultUnitPrice: number;
 }
 
+/** 品牌/卖家信息（导出单抬头） */
+export interface BrandInfo {
+  /** 卖家名称，显示在客户报价图/生产制作单抬头 */
+  sellerName: string;
+}
+
 /** 设置数据（单行） */
 export interface Settings {
   /** 默认机柜尺寸 */
@@ -295,6 +301,8 @@ export interface Settings {
   defaultTrayCount: number;
   /** 默认托盘单价（托盘作为配件的默认单价） */
   defaultTrayUnitPrice: number;
+  /** 品牌/卖家信息 */
+  brand: BrandInfo;
   /** 默认配件分组配置 */
   defaultAccessories: DefaultAccessoryConfig[];
 }

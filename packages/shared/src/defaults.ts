@@ -39,6 +39,7 @@ export const DEFAULT_SETTINGS: Settings = {
     trayCoeffA: 0,
     trayCoeffB: 0,
   },
+  brand: { sellerName: '@包黑蛋' },
   defaultAccessories: DEFAULT_ACCESSORIES,
 };
 
