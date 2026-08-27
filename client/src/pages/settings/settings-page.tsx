@@ -1,14 +1,18 @@
 /**
- * 设置页：默认参数 + 配件配置 + 备份导入。
+ * 设置页：品牌信息 + 默认参数 + 配件配置 + 账户安全 + 备份导入。
+ * v2：新增「品牌信息」（导出单抬头卖家名）；尺寸与颜色合并为「默认机柜」卡；
+ *     颜色用 SegmentedControl 替换原生 select。
  */
 
 import { useEffect, useState } from 'react';
 import { Save, RotateCcw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { NumberField } from '@/components/number-field';
+import { SegmentedControl } from '@/components/ui/segmented-control';
 import { ParamRow } from '@/components/param-row';
-import { Select } from '@/components/ui/select';
 import { useSettingsStore } from '@/store/settings-store';
 import { useToast } from '@/components/toaster';
 import { LoadingState } from '@/components/states';
@@ -27,6 +31,7 @@ export function SettingsPage() {
     setDefaultSize,
     setDefaultColor,
     setPricing,
+    setBrand,
     save,
   } = useSettingsStore();
   const toast = useToast((s) => s.show);
@@ -42,7 +47,7 @@ export function SettingsPage() {
       await save();
       toast('设置已保存');
     } catch (e) {
-      toast(`保存失败：${e}`);
+      toast(`设置保存失败：${e}`);
     } finally {
       setSaving(false);
     }
@@ -70,7 +75,7 @@ export function SettingsPage() {
           <div className="label-mono text-accent">SETTINGS · 设置</div>
           <h1 className="mt-1 text-xl font-bold tracking-tight lg:text-2xl">设置</h1>
           <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
-            默认机柜参数、计价参数、配件配置
+            品牌信息、默认机柜参数、计价参数、配件配置
           </p>
         </div>
         <div className="flex gap-2">
@@ -86,84 +91,91 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-2">
-        {/* 默认尺寸 */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">默认机柜尺寸</CardTitle>
-            <CardDescription>新建报价/订单时自动带入</CardDescription>
-          </CardHeader>
-          <CardContent className="grid grid-cols-3 gap-3">
+      {/* 品牌：导出单抬头 */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">品牌信息</CardTitle>
+          <CardDescription>显示在客户报价图 / 生产制作单的抬头（如「卖家 @店名」）</CardDescription>
+        </CardHeader>
+        <CardContent className="max-w-md">
+          <div className="space-y-1.5">
+            <Label>卖家名称</Label>
+            <Input
+              value={settings.brand.sellerName}
+              onChange={(e) => setBrand({ sellerName: e.target.value })}
+              placeholder="如 @某某铝业"
+              maxLength={50}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* 默认机柜：尺寸 + 颜色合并一卡，视觉平衡且少一次扫视跳转 */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">默认机柜</CardTitle>
+          <CardDescription>新建报价/订单时自动带入</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <div className="grid grid-cols-3 gap-3">
             <NumberField label="宽" value={settings.defaultSize.width} onChange={(v) => setDefaultSize('width', v)} suffix="mm" />
             <NumberField label="深" value={settings.defaultSize.depth} onChange={(v) => setDefaultSize('depth', v)} suffix="mm" />
             <NumberField label="高" value={settings.defaultSize.height} onChange={(v) => setDefaultSize('height', v)} suffix="mm" />
-          </CardContent>
-        </Card>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">默认颜色</Label>
+            <SegmentedControl
+              ariaLabel="默认颜色"
+              value={settings.defaultColor}
+              onChange={setDefaultColor}
+              options={[
+                { value: 'silver', label: COLOR_LABEL.silver, dot: '#E4E4E7' },
+                { value: 'black', label: COLOR_LABEL.black, dot: '#3F3F46' },
+              ]}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* 默认颜色 */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">默认颜色</CardTitle>
-            <CardDescription>新建报价时的初始值</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">默认颜色</label>
-              <Select value={settings.defaultColor} onChange={(e) => setDefaultColor(e.target.value as 'silver' | 'black')}>
-                {(['silver', 'black'] as const).map((c) => (
-                  <option key={c} value={c}>{COLOR_LABEL[c]}</option>
-                ))}
-              </Select>
+      {/* 计价参数 */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">默认计价参数</CardTitle>
+          <CardDescription>单次报价可在报价页覆盖这些值</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {/* 表格形式：标签固定宽 + 输入框等宽对齐 + 单位固定宽 */}
+          <div className="grid grid-cols-1 gap-x-10 lg:grid-cols-2">
+            {/* 型材 */}
+            <div>
+              <div className="label-mono mb-1 border-b border-border pb-1 text-[10px] text-muted-foreground/70">型材</div>
+              <ParamRow label="银色型材单价" unit="元/m" value={p.silverPrice} onChange={(v) => setPricing({ silverPrice: v })} displayDecimals={2} />
+              <ParamRow label="黑色型材单价" unit="元/m" value={p.blackPrice} onChange={(v) => setPricing({ blackPrice: v })} displayDecimals={2} />
+              <ParamRow label="损耗率" unit="%" value={p.wastage} onChange={(v) => setPricing({ wastage: v })} wastage />
+              <ParamRow label="默认毛利率" unit="%" value={p.profitRate} onChange={(v) => setPricing({ profitRate: v })} percent />
             </div>
-          </CardContent>
-        </Card>
-
-        {/* 计价参数 */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-3">
-            <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">默认计价参数</CardTitle>
-            <CardDescription>单次报价可在报价页覆盖这些值</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* 表格形式：标签固定宽 + 输入框等宽对齐 + 单位固定宽 */}
-            <div className="grid grid-cols-1 gap-x-10 lg:grid-cols-2">
-              {/* 型材 */}
-              <div>
-                <div className="label-mono mb-1 border-b border-border pb-1 text-[10px] text-muted-foreground/70">型材</div>
-                <ParamRow label="银色型材单价" unit="元/m" value={p.silverPrice} onChange={(v) => setPricing({ silverPrice: v })} />
-                <ParamRow label="黑色型材单价" unit="元/m" value={p.blackPrice} onChange={(v) => setPricing({ blackPrice: v })} />
-                <ParamRow label="损耗率" unit="%" value={p.wastage} onChange={(v) => setPricing({ wastage: v })} wastage />
-                <ParamRow label="默认毛利率" unit="%" value={p.profitRate} onChange={(v) => setPricing({ profitRate: v })} percent />
-              </div>
-              {/* 费用 + 托盘 */}
-              <div>
-                <div className="label-mono mb-1 border-b border-border pb-1 text-[10px] text-muted-foreground/70">费用</div>
-                <ParamRow label="切割处理费" unit="元" value={p.cuttingFee} onChange={(v) => setPricing({ cuttingFee: v })} />
-                <ParamRow label="安装费" unit="元" value={p.installFee} onChange={(v) => setPricing({ installFee: v })} />
-                <ParamRow label="运费" unit="元" value={p.freight} onChange={(v) => setPricing({ freight: v })} />
-                <div className="label-mono mb-1 mt-3 border-b border-border pb-1 text-[10px] text-muted-foreground/70">托盘</div>
-                <ParamRow label="托盘系数 A" unit="" value={p.trayCoeffA} onChange={(v) => setPricing({ trayCoeffA: v })} unclamped />
-                <ParamRow label="托盘系数 B" unit="" value={p.trayCoeffB} onChange={(v) => setPricing({ trayCoeffB: v })} unclamped />
-              </div>
+            {/* 费用 + 托盘 */}
+            <div>
+              <div className="label-mono mb-1 border-b border-border pb-1 text-[10px] text-muted-foreground/70">费用</div>
+              <ParamRow label="切割处理费" unit="元" value={p.cuttingFee} onChange={(v) => setPricing({ cuttingFee: v })} displayDecimals={2} />
+              <ParamRow label="安装费" unit="元" value={p.installFee} onChange={(v) => setPricing({ installFee: v })} displayDecimals={2} />
+              <ParamRow label="运费" unit="元" value={p.freight} onChange={(v) => setPricing({ freight: v })} displayDecimals={2} />
+              <div className="label-mono mb-1 mt-3 border-b border-border pb-1 text-[10px] text-muted-foreground/70">托盘</div>
+              <ParamRow label="托盘系数 A" unit="" value={p.trayCoeffA} onChange={(v) => setPricing({ trayCoeffA: v })} unclamped />
+              <ParamRow label="托盘系数 B" unit="" value={p.trayCoeffB} onChange={(v) => setPricing({ trayCoeffB: v })} unclamped />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* 配件配置（跨列） */}
-        <div className="lg:col-span-2">
-          <AccessoriesConfig />
-        </div>
+      {/* 配件配置 */}
+      <AccessoriesConfig />
 
-        {/* 修改密码（跨列） */}
-        <div className="lg:col-span-2">
-          <ChangePasswordSection />
-        </div>
+      {/* 修改密码 */}
+      <ChangePasswordSection />
 
-        {/* 备份导入（跨列） */}
-        <div className="lg:col-span-2">
-          <BackupSection />
-        </div>
-      </div>
+      {/* 备份导入 */}
+      <BackupSection />
     </div>
   );
 }

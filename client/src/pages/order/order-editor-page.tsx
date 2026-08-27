@@ -4,6 +4,9 @@
  *  - /orders/new             手动新建（空表单，调 ordersApi.create）
  *  - /orders/new?fromQuote=x 从报价转单（调 quotesApi.convert，带客户/收货信息）
  *  - /orders/:id             编辑（调 ordersApi.update）
+ *
+ * v2：客户与收货合并一卡；材料按类别分组；零材料成本时利润中性显示防误导；
+ *     移动端底部常驻预估利润条。
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -15,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { NumberField } from '@/components/number-field';
 import { AccessoryRow } from '@/components/quote-form/accessory-row';
+import { PriceActionBar } from '@/components/price-action-bar';
 import { useOrderStore } from '@/store/order-store';
 import { useToast } from '@/components/toaster';
 import { LoadingState } from '@/components/states';
@@ -22,11 +26,15 @@ import { Modal } from '@/components/ui/modal';
 import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
 import { emptyConvertForm, type ConvertConfirmForm } from '@/lib/convert-form';
 import { ordersApi, quotesApi, settingsApi } from '@/lib/api';
-import { formatMoney } from '@/lib/utils';
+import { formatMoney, cn } from '@/lib/utils';
 import { calcOrderFinance, roundMoney } from '@idlefish/shared';
-import type { AccessoryItem, CabinetSize, QuoteRecord } from '@idlefish/shared';
+import { CATEGORY_LABEL } from '@/lib/status';
+import type { AccessoryCategory, AccessoryItem, CabinetSize, QuoteRecord } from '@idlefish/shared';
 
 type Mode = 'create' | 'convert' | 'edit';
+
+/** 材料分组展示顺序（custom 兜底在最后） */
+const MATERIAL_ORDER: AccessoryCategory[] = ['connector', 'fastener', 'blindplate', 'tray', 'custom'];
 
 export function OrderEditorPage() {
   const { id } = useParams<{ id?: string }>();
@@ -248,9 +256,20 @@ export function OrderEditorPage() {
   const actualPrice = mode === 'convert' ? convertForm.finance.actualPrice : form.actualPrice;
   const remark = mode === 'convert' ? convertForm.remark : form.remark;
 
+  /** 材料成本为 0：利润指标无意义，降为中性提示而非绿色「盈利」 */
+  const zeroMaterialCost = materialCost === 0;
+
+  const bindCustomer = (patch: Partial<typeof customer>) =>
+    mode === 'convert'
+      ? setConvertForm((f) => ({ ...f, customer: { ...f.customer, ...patch } }))
+      : setCustomer(patch);
+  const bindAddress = (patch: Partial<typeof shippingAddress>) =>
+    mode === 'convert'
+      ? setConvertForm((f) => ({ ...f, shippingAddress: { ...f.shippingAddress, ...patch } }))
+      : setShippingAddress(patch);
+
   // M8：edit 模式材料清单可编辑，但材料成本此前用的是已存旧值——清单变更后自动按清单重算，
   // 避免「新清单 + 旧材料成本」落库导致预估成本/利润与看板统计失真。
-  // （create 模式的成本本就在渲染时派生自清单；convert 模式清单只读，均无需处理。）
   function recalcMaterialCost(next: AccessoryItem[]) {
     setMaterialCost(roundMoney(next.reduce((sum, m) => sum + m.quantity * m.unitPrice, 0)));
   }
@@ -267,16 +286,49 @@ export function OrderEditorPage() {
     if (mode === 'edit') recalcMaterialCost([...form.materials, item]);
   }
 
+  /** 材料按类别分组（保持类别顺序，custom 最后）。数据量小，普通派生即可——不可用 useMemo：
+      本组件在它之前存在条件性提前 return，hook 数量会随渲染分支变化触发 React #310。 */
+  const groupedMaterials = MATERIAL_ORDER.map((cat) => ({
+    cat,
+    items: materials
+      .map((m, i) => ({ m, i }))
+      .filter(({ m }) => m.category === cat),
+  })).filter((g) => g.items.length > 0);
+
+  const setFieldByMode =
+    <K extends 'materialCost' | 'installFee' | 'freight' | 'actualPrice'>(key: K) =>
+    (v: number) =>
+      mode === 'convert'
+        ? setConvertForm((f) => ({ ...f, finance: { ...f.finance, [key]: v } }))
+        : key === 'materialCost'
+          ? setMaterialCost(v)
+          : key === 'installFee'
+            ? setInstallFee(v)
+            : key === 'freight'
+              ? setFreight(v)
+              : setActualPrice(v);
+
   return (
     <div className="space-y-4">
       {/* 操作栏 sticky：长表单时保存始终可达 */}
       <div className="sticky top-0 z-20 -mx-3 flex flex-col gap-3 border-b bg-background/80 px-3 py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between lg:-mx-6 lg:px-6">
-        <BackBar
-          onBack={() => navigate('/orders')}
-          title={mode === 'convert' ? '报价转订单' : mode === 'edit' ? '编辑订单' : '新建订单'}
-          code="ORDER · 订单"
-        />
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/orders')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <h1 className="text-xl font-bold">
+            {mode === 'convert' ? '报价转订单' : mode === 'edit' ? '编辑订单' : '新建订单'}
+          </h1>
+          <span className="label-mono hidden text-[10px] text-accent sm:block">ORDER · 订单</span>
+        </div>
+        <div className="flex gap-2 lg:hidden">
+          <Button variant="outline" onClick={() => navigate('/orders')}>取消</Button>
+          <Button variant="accent" onClick={handleSave} disabled={saving}>
+            <Save className="h-4 w-4" />
+            {saving ? '保存中…' : '保存'}
+          </Button>
+        </div>
+        <div className="hidden gap-2 sm:flex">
           <Button variant="outline" className="shrink-0" onClick={() => navigate('/orders')}>取消</Button>
           <Button variant="accent" className="shrink-0" onClick={handleSave} disabled={saving}>
             <Save className="h-4 w-4" />
@@ -285,64 +337,44 @@ export function OrderEditorPage() {
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        {/* 左：订单要素 */}
         <div className="space-y-4">
-          {/* 客户信息 */}
+          {/* 客户与收货（合并卡）：sm 起两列网格，减少半屏滚动距离 */}
           <Card>
-            <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">客户信息</CardTitle></CardHeader>
+            <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">客户与收货</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <div className="space-y-1.5">
-                <Label>客户名称</Label>
-                <Input
-                  value={customer.name}
-                  onChange={(e) =>
-                    mode === 'convert'
-                      ? setConvertForm((f) => ({ ...f, customer: { ...f.customer, name: e.target.value } }))
-                      : setCustomer({ name: e.target.value })
-                  }
-                  placeholder="客户名称"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>平台订单号</Label>
-                <Input
-                  value={customer.platformOrderNo}
-                  onChange={(e) =>
-                    mode === 'convert'
-                      ? setConvertForm((f) => ({ ...f, customer: { ...f.customer, platformOrderNo: e.target.value } }))
-                      : setCustomer({ platformOrderNo: e.target.value })
-                  }
-                  placeholder="如淘宝/京东订单号"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 收货信息 */}
-          <Card>
-            <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">收货信息</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>客户名称 *</Label>
+                  <Input
+                    value={customer.name}
+                    onChange={(e) => bindCustomer({ name: e.target.value })}
+                    placeholder="客户名称"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>平台订单号</Label>
+                  <Input
+                    value={customer.platformOrderNo}
+                    onChange={(e) => bindCustomer({ platformOrderNo: e.target.value })}
+                    placeholder="如淘宝/京东订单号"
+                  />
+                </div>
                 <div className="space-y-1.5">
                   <Label>收件人</Label>
                   <Input
                     value={shippingAddress.receiver}
-                    onChange={(e) =>
-                      mode === 'convert'
-                        ? setConvertForm((f) => ({ ...f, shippingAddress: { ...f.shippingAddress, receiver: e.target.value } }))
-                        : setShippingAddress({ receiver: e.target.value })
-                    }
+                    onChange={(e) => bindAddress({ receiver: e.target.value })}
+                    placeholder="收件人姓名"
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label>电话</Label>
                   <Input
                     value={shippingAddress.phone}
-                    onChange={(e) =>
-                      mode === 'convert'
-                        ? setConvertForm((f) => ({ ...f, shippingAddress: { ...f.shippingAddress, phone: e.target.value } }))
-                        : setShippingAddress({ phone: e.target.value })
-                    }
+                    onChange={(e) => bindAddress({ phone: e.target.value })}
+                    placeholder="手机号码"
                   />
                 </div>
               </div>
@@ -350,11 +382,7 @@ export function OrderEditorPage() {
                 <Label>收货地址</Label>
                 <Input
                   value={shippingAddress.address}
-                  onChange={(e) =>
-                    mode === 'convert'
-                      ? setConvertForm((f) => ({ ...f, shippingAddress: { ...f.shippingAddress, address: e.target.value } }))
-                      : setShippingAddress({ address: e.target.value })
-                  }
+                  onChange={(e) => bindAddress({ address: e.target.value })}
                   placeholder="省市区详细地址"
                 />
               </div>
@@ -395,21 +423,35 @@ export function OrderEditorPage() {
                 </Button>
               )}
             </CardHeader>
-            <CardContent className="space-y-2">
-              {materials.length === 0 ? (
+            <CardContent className="space-y-4">
+              {groupedMaterials.length === 0 ? (
                 <div className="rounded-md border border-dashed py-3 text-center text-xs text-muted-foreground">
                   无材料
                 </div>
               ) : (
-                materials.map((m, i) => (
-                  <AccessoryRow
-                    key={i}
-                    item={m}
-                    index={i}
-                    onUpdate={handleMaterialUpdate}
-                    onRemove={handleMaterialRemove}
-                    nameEditable={mode !== 'convert'}
-                  />
+                groupedMaterials.map(({ cat, items }) => (
+                  <div key={cat} className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">{CATEGORY_LABEL[cat]}</Label>
+                    <div className="hidden grid-cols-[minmax(0,1fr)_72px_88px_88px_32px] items-end gap-2 border-b border-border pb-1 text-xs text-muted-foreground sm:grid">
+                      <div>名称</div>
+                      <div className="text-right">数量</div>
+                      <div className="text-right">单价</div>
+                      <div className="text-right">小计</div>
+                      <div />
+                    </div>
+                    <div className="space-y-1">
+                      {items.map(({ m, i }) => (
+                        <AccessoryRow
+                          key={i}
+                          item={m}
+                          index={i}
+                          onUpdate={handleMaterialUpdate}
+                          onRemove={handleMaterialRemove}
+                          nameEditable={mode !== 'convert'}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 ))
               )}
               {mode === 'convert' && materials.length > 0 && (
@@ -427,100 +469,33 @@ export function OrderEditorPage() {
               <div className="grid grid-cols-2 gap-3">
                 {mode === 'convert' ? (
                   <>
-                    <NumberField
-                      label="材料成本"
-                      value={materialCost}
-                      onChange={(v) =>
-                        setConvertForm((f) => ({ ...f, finance: { ...f.finance, materialCost: v } }))
-                      }
-                      step={0.01}
-                      suffix="元"
-                    />
-                    <NumberField
-                      label="安装费"
-                      value={installFee}
-                      onChange={(v) =>
-                        setConvertForm((f) => ({ ...f, finance: { ...f.finance, installFee: v } }))
-                      }
-                      step={0.01}
-                      suffix="元"
-                    />
-                    <NumberField
-                      label="运费"
-                      value={freight}
-                      onChange={(v) =>
-                        setConvertForm((f) => ({ ...f, finance: { ...f.finance, freight: v } }))
-                      }
-                      step={0.01}
-                      suffix="元"
-                    />
-                    <NumberField
-                      label="实际售价"
-                      value={actualPrice}
-                      onChange={(v) =>
-                        setConvertForm((f) => ({ ...f, finance: { ...f.finance, actualPrice: v } }))
-                      }
-                      step={0.01}
-                      suffix="元"
-                    />
+                    <NumberField label="材料成本" value={materialCost} onChange={setFieldByMode('materialCost')} step={0.01} suffix="元" displayDecimals={2} />
+                    <NumberField label="安装费" value={installFee} onChange={setFieldByMode('installFee')} step={0.01} suffix="元" displayDecimals={2} />
+                    <NumberField label="运费" value={freight} onChange={setFieldByMode('freight')} step={0.01} suffix="元" displayDecimals={2} />
+                    <NumberField label="实际售价" value={actualPrice} onChange={setFieldByMode('actualPrice')} step={0.01} suffix="元" displayDecimals={2} />
                   </>
                 ) : mode === 'create' ? (
                   <>
                     {/* 新建：材料成本按材料清单实时计算，只读 */}
                     <ReadOnlyField label="材料成本（按清单计算）" value={formatMoney(materialCost)} />
-                    <NumberField
-                      label="安装费"
-                      value={installFee}
-                      onChange={(v) => setInstallFee(v)}
-                      step={0.01}
-                      suffix="元"
-                    />
-                    <NumberField
-                      label="运费"
-                      value={freight}
-                      onChange={(v) => setFreight(v)}
-                      step={0.01}
-                      suffix="元"
-                    />
-                    <NumberField
-                      label="实际售价"
-                      value={actualPrice}
-                      onChange={(v) => setActualPrice(v)}
-                      step={0.01}
-                      suffix="元"
-                    />
+                    <NumberField label="安装费" value={installFee} onChange={setFieldByMode('installFee')} step={0.01} suffix="元" displayDecimals={2} />
+                    <NumberField label="运费" value={freight} onChange={setFieldByMode('freight')} step={0.01} suffix="元" displayDecimals={2} />
+                    <NumberField label="实际售价" value={actualPrice} onChange={setFieldByMode('actualPrice')} step={0.01} suffix="元" displayDecimals={2} />
                   </>
                 ) : (
                   <>
                     <NumberField
                       label="材料成本"
                       value={materialCost}
-                      onChange={(v) => setMaterialCost(v)}
+                      onChange={setFieldByMode('materialCost')}
                       step={0.01}
                       suffix="元"
+                      displayDecimals={2}
                       helper="修改材料清单后将自动按清单重算"
                     />
-                    <NumberField
-                      label="安装费"
-                      value={installFee}
-                      onChange={(v) => setInstallFee(v)}
-                      step={0.01}
-                      suffix="元"
-                    />
-                    <NumberField
-                      label="运费"
-                      value={freight}
-                      onChange={(v) => setFreight(v)}
-                      step={0.01}
-                      suffix="元"
-                    />
-                    <NumberField
-                      label="实际售价"
-                      value={actualPrice}
-                      onChange={(v) => setActualPrice(v)}
-                      step={0.01}
-                      suffix="元"
-                    />
+                    <NumberField label="安装费" value={installFee} onChange={setFieldByMode('installFee')} step={0.01} suffix="元" displayDecimals={2} />
+                    <NumberField label="运费" value={freight} onChange={setFieldByMode('freight')} step={0.01} suffix="元" displayDecimals={2} />
+                    <NumberField label="实际售价" value={actualPrice} onChange={setFieldByMode('actualPrice')} step={0.01} suffix="元" displayDecimals={2} />
                   </>
                 )}
               </div>
@@ -532,8 +507,24 @@ export function OrderEditorPage() {
 
               <div className="space-y-2 rounded-lg bg-muted/50 p-4">
                 <FinanceRow label="预估成本" value={formatMoney(finance.estimatedCost)} />
-                <FinanceRow label="预估利润" value={formatMoney(finance.estimatedProfit)} accent={finance.estimatedProfit >= 0 ? 'good' : 'bad'} />
-                <FinanceRow label="预估毛利率" value={`${finance.estimatedProfitRatePct}%`} />
+                {zeroMaterialCost ? (
+                  <>
+                    <FinanceRow label="预估利润" value={formatMoney(finance.estimatedProfit)} muted />
+                    <FinanceRow label="预估毛利率" value={`${finance.estimatedProfitRatePct}%`} muted />
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      材料成本为 0，利润仅供参考——请在清单中填写单价或手工填入材料成本后再判断盈亏。
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <FinanceRow
+                      label="预估利润"
+                      value={formatMoney(finance.estimatedProfit)}
+                      accent={finance.estimatedProfit >= 0 ? 'good' : 'bad'}
+                    />
+                    <FinanceRow label="预估毛利率" value={`${finance.estimatedProfitRatePct}%`} />
+                  </>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -545,6 +536,7 @@ export function OrderEditorPage() {
                       ? setConvertForm((f) => ({ ...f, remark: e.target.value }))
                       : setRemark(e.target.value)
                   }
+                  placeholder="选填"
                 />
               </div>
             </CardContent>
@@ -562,20 +554,27 @@ export function OrderEditorPage() {
           </div>
         </div>
       </Modal>
+
+      {/* 移动端底部常驻利润条 */}
+      <PriceActionBar
+        label="预估利润"
+        value={finance.estimatedProfit}
+        hint={`毛利率 ${finance.estimatedProfitRatePct}%${zeroMaterialCost ? ' · 材料成本为 0' : ''}`}
+        danger={finance.estimatedProfit < 0 || zeroMaterialCost}
+        onSave={handleSave}
+        saving={saving}
+      />
     </div>
   );
 }
 
-function BackBar({ onBack, title, code }: { onBack: () => void; title: string; code?: string }) {
+function BackBar({ onBack, title }: { onBack: () => void; title: string }) {
   return (
     <div className="flex items-center gap-3">
       <Button variant="ghost" size="icon" onClick={onBack}>
         <ArrowLeft className="h-4 w-4" />
       </Button>
-      <div>
-        {code && <div className="label-mono text-[10px] text-accent">{code}</div>}
-        <h1 className="text-xl font-bold">{title}</h1>
-      </div>
+      <h1 className="text-xl font-bold">{title}</h1>
     </div>
   );
 }
@@ -584,22 +583,24 @@ function FinanceRow({
   label,
   value,
   accent,
+  muted,
 }: {
   label: string;
   value: string;
   accent?: 'good' | 'bad';
+  muted?: boolean;
 }) {
   return (
     <div className="flex items-center justify-between text-sm">
       <span className="text-muted-foreground">{label}</span>
       <span
-        className={`tabular font-semibold ${
-          accent === 'good'
-            ? 'text-emerald-600 dark:text-emerald-400'
-            : accent === 'bad'
-              ? 'text-destructive'
-              : ''
-        }`}
+        className={cn(
+          'tabular font-semibold',
+          !accent && !muted && 'text-foreground',
+          accent === 'good' && 'text-emerald-600 dark:text-emerald-400',
+          accent === 'bad' && 'text-destructive',
+          muted && 'font-normal text-muted-foreground',
+        )}
       >
         {value}
       </span>

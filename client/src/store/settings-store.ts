@@ -4,6 +4,7 @@
 
 import { create } from 'zustand';
 import {
+  type BrandInfo,
   type CabinetSize,
   type DefaultAccessoryConfig,
   type PricingParams,
@@ -25,6 +26,7 @@ interface SettingsStoreState {
   setDefaultTrayCount: (count: number) => void;
   setDefaultTrayUnitPrice: (price: number) => void;
   setPricing: (patch: Partial<PricingParams>) => void;
+  setBrand: (patch: Partial<BrandInfo>) => void;
 
   addAccessory: () => void;
   updateAccessory: (index: number, patch: Partial<DefaultAccessoryConfig>) => void;
@@ -65,6 +67,13 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
     set((s) =>
       s.settings
         ? { settings: { ...s.settings, defaultPricing: { ...s.settings.defaultPricing, ...patch } }, dirty: true }
+        : {},
+    ),
+
+  setBrand: (patch) =>
+    set((s) =>
+      s.settings
+        ? { settings: { ...s.settings, brand: { ...s.settings.brand, ...patch } }, dirty: true }
         : {},
     ),
 

@@ -12,13 +12,7 @@ import { calcQuote } from '@idlefish/shared';
 import { CATEGORY_LABEL } from '@/lib/status';
 import { buildCostText, buildMaterialsText, copyText } from '@/lib/clipboard';
 import { formatMoney, profitColor, cn } from '@/lib/utils';
-import { useSpringNumber } from '@/lib/use-spring-number';
-
-/** 金额 spring 过渡：数值变化时弹簧平滑，而非瞬变 */
-function SpringMoney({ value, className }: { value: number; className?: string }) {
-  const spring = useSpringNumber(value);
-  return <div className={className}>{formatMoney(spring)}</div>;
-}
+import { SpringMoney } from './spring-money';
 
 export function CostSummary() {
   const input = useQuoteStore((s) => s.input);
@@ -37,6 +31,16 @@ export function CostSummary() {
 
   const b = result.breakdown;
   const negativeProfit = result.expectedProfit < 0;
+
+  /** 费用行三态：未勾选→灰"未计入"；勾选但金额 0→琥珀警示；正常→金额 */
+  function FeeRow({ label, fee, enabled }: { label: string; fee: number; enabled: boolean }) {
+    if (!enabled) return <Row label={label} value="未计入" muted />;
+    if (fee === 0)
+      return (
+        <Row label={label} value="¥0.00（已勾选）" className="text-amber-600 dark:text-amber-400" />
+      );
+    return <Row label={label} value={formatMoney(fee)} />;
+  }
 
   return (
     <Card>
@@ -59,8 +63,8 @@ export function CostSummary() {
         ))}
         <Divider />
         <Row label="材料成本" value={formatMoney(b.materialCost)} bold />
-        <Row label="安装费" value={b.installFee > 0 ? formatMoney(b.installFee) : '未计入'} muted={!b.installFee} />
-        <Row label="运费" value={b.freight > 0 ? formatMoney(b.freight) : '未计入'} muted={!b.freight} />
+        <FeeRow label="安装费" fee={b.installFee} enabled={input.installEnabled} />
+        <FeeRow label="运费" fee={b.freight} enabled={input.freightEnabled} />
         <Row label="总成本" value={formatMoney(b.totalCost)} bold />
 
         {/* 最终报价 + 利润：负利润加警告环 */}
@@ -96,12 +100,14 @@ function Row({
   sub,
   bold,
   muted,
+  className,
 }: {
   label: string;
   value: string;
   sub?: string;
   bold?: boolean;
   muted?: boolean;
+  className?: string;
 }) {
   return (
     <div className="flex items-center justify-between text-sm">
@@ -109,7 +115,7 @@ function Row({
         {label}
         {sub && <span className="ml-1 text-xs text-muted-foreground">({sub})</span>}
       </span>
-      <span className={cn('tabular', bold && 'font-semibold', muted && 'text-muted-foreground/60')}>{value}</span>
+      <span className={cn('tabular', bold && 'font-semibold', muted && 'text-muted-foreground/60', className)}>{value}</span>
     </div>
   );
 }

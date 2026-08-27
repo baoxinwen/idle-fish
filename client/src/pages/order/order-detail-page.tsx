@@ -1,10 +1,23 @@
 /**
  * 订单详情页：完整信息展示 + 状态流转步骤条 + 发货核对。
+ * v2：预估/实际财务合并为一张对照表（含差异列）；取消按钮降级靠右；
+ *     零数量材料折叠；运单号可复制；来源报价可点击回跳。
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Pencil, Truck, XCircle, CheckCircle2, Factory, PackageCheck } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import {
+  ArrowLeft,
+  Pencil,
+  Truck,
+  XCircle,
+  CheckCircle2,
+  Factory,
+  PackageCheck,
+  Copy,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -17,25 +30,17 @@ import { useToast } from '@/components/toaster';
 import { LoadingState, EmptyState } from '@/components/states';
 import { confirmDialog } from '@/components/confirm-dialog';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_BADGE, CATEGORY_LABEL } from '@/lib/status';
-import { formatMoney, formatDateTime, cn } from '@/lib/utils';
+import { formatMoney, formatShortDateTime, cn, profitColor } from '@/lib/utils';
+import { copyText } from '@/lib/clipboard';
 import type { OrderRecord, OrderStatus } from '@idlefish/shared';
 
 /** 各状态可执行的动作 */
 const ACTIONS: Partial<
   Record<OrderStatus, { label: string; next: OrderStatus; icon: typeof Factory; variant: 'default' | 'outline' | 'destructive' }[]>
 > = {
-  pending: [
-    { label: '开始生产', next: 'producing', icon: Factory, variant: 'default' },
-    { label: '取消订单', next: 'cancelled', icon: XCircle, variant: 'destructive' },
-  ],
-  producing: [
-    { label: '完成生产', next: 'ready', icon: Factory, variant: 'default' },
-    { label: '取消订单', next: 'cancelled', icon: XCircle, variant: 'destructive' },
-  ],
-  ready: [
-    { label: '确认发货', next: 'shipped', icon: Truck, variant: 'default' },
-    { label: '取消订单', next: 'cancelled', icon: XCircle, variant: 'destructive' },
-  ],
+  pending: [{ label: '开始生产', next: 'producing', icon: Factory, variant: 'default' }],
+  producing: [{ label: '完成生产', next: 'ready', icon: Factory, variant: 'default' }],
+  ready: [{ label: '确认发货', next: 'shipped', icon: Truck, variant: 'default' }],
   shipped: [{ label: '确认签收', next: 'done', icon: CheckCircle2, variant: 'default' }],
   done: [],
   cancelled: [],
@@ -52,6 +57,8 @@ export function OrderDetailPage() {
   const [loading, setLoading] = useState(true);
   const [shipOpen, setShipOpen] = useState(false);
   const [shipForm, setShipForm] = useState({ courier: '', trackingNo: '', actualFreight: 0, checkRemark: '' });
+  // 零数量材料默认折叠
+  const [showZeroMaterials, setShowZeroMaterials] = useState(false);
 
   // M7：竞态守卫——路由复用同一元素切换 id 时，丢弃迟到响应，避免 A 的数据覆盖 B
   const reqSeq = useRef(0);
@@ -68,6 +75,7 @@ export function OrderDetailPage() {
       const r = await ordersApi.get(id);
       if (seq !== reqSeq.current) return;
       setRecord(r);
+      setShowZeroMaterials(false);
     } catch (e) {
       if (seq !== reqSeq.current) return;
       toast(`加载失败：${e}`);
@@ -110,12 +118,26 @@ export function OrderDetailPage() {
     }
   }
 
+  async function handleCopyTracking(text: string) {
+    const ok = await copyText(text);
+    toast(ok ? '已复制运单号' : '复制失败');
+  }
+
   if (loading) return <LoadingState />;
   if (!id || !record) return <EmptyState text="订单不存在" />;
 
   const actions = ACTIONS[record.status] ?? [];
   const canEdit = record.status === 'pending' || record.status === 'producing' || record.status === 'ready';
   const currentStep = FLOW.indexOf(record.status);
+  const cancelAction = record.status !== 'done' && record.status !== 'cancelled';
+
+  const materials = record.materials;
+  const activeMaterials = materials.filter((m) => m.quantity > 0);
+  const zeroMaterials = materials.filter((m) => m.quantity === 0);
+
+  /** 财务对照：实际列仅发货后有值 */
+  const ship = record.shipping;
+  const fin = record.finance;
 
   return (
     <div className="space-y-4">
@@ -132,7 +154,14 @@ export function OrderDetailPage() {
                 {ORDER_STATUS_LABEL[record.status]}
               </Badge>
             </div>
-            {record.quoteId && <p className="text-xs text-muted-foreground">由报价转入</p>}
+            {record.quoteId && (
+              <Link
+                to={`/quotes/${record.quoteId}`}
+                className="mt-0.5 inline-block text-xs text-muted-foreground underline-offset-2 hover:text-accent hover:underline"
+              >
+                由报价转入 ↗
+              </Link>
+            )}
           </div>
         </div>
         {canEdit && (
@@ -191,16 +220,15 @@ export function OrderDetailPage() {
                   <div className="text-sm font-medium">{ORDER_STATUS_LABEL[record.status]}</div>
                   <div className="text-xs text-muted-foreground">第 {currentStep + 1}/{FLOW.length} 步 · {ORDER_STATUS_LABEL[FLOW[currentStep + 1] ?? FLOW[currentStep]]}</div>
                 </div>
-                {/* 进度条 */}
                 <div className="ml-auto h-1.5 w-24 overflow-hidden rounded-full bg-secondary">
                   <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${((currentStep + 1) / FLOW.length) * 100}%` }} />
                 </div>
               </div>
             </>
           )}
-          {/* 操作按钮 */}
-          {actions.length > 0 && (
-            <div className="mt-4 flex flex-wrap gap-2 border-t pt-4">
+          {/* 操作区：主操作居左，取消这类破坏性动作降级为 outline 并靠右，避免误触 */}
+          {(actions.length > 0 || cancelAction) && (
+            <div className="mt-4 flex flex-wrap items-center gap-2 border-t pt-4">
               {actions.map((a) => {
                 const Icon = a.icon;
                 const isShip = a.next === 'shipped';
@@ -215,6 +243,16 @@ export function OrderDetailPage() {
                   </Button>
                 );
               })}
+              {cancelAction && (
+                <Button
+                  variant="outline"
+                  className="ml-auto border-destructive/30 text-destructive hover:bg-destructive/5 hover:text-destructive"
+                  onClick={() => handleTransition('cancelled')}
+                >
+                  <XCircle className="h-4 w-4" />
+                  取消订单
+                </Button>
+              )}
             </div>
           )}
         </CardContent>
@@ -243,72 +281,128 @@ export function OrderDetailPage() {
             />
             <div>
               <div className="mb-1 text-muted-foreground">材料清单</div>
-              {record.materials.length === 0 ? (
+              {materials.length === 0 ? (
                 <div className="text-muted-foreground">无</div>
               ) : (
                 <div className="space-y-1">
-                  {record.materials.map((m, i) => (
-                    <div key={i} className="flex justify-between tabular">
-                      <span>
-                        <span className="text-xs text-muted-foreground">[{CATEGORY_LABEL[m.category]}]</span> {m.name}
-                      </span>
-                      <span className="text-muted-foreground">
-                        {m.quantity} × {formatMoney(m.unitPrice)}
-                      </span>
-                    </div>
+                  {activeMaterials.map((m, i) => (
+                    <MaterialLine key={i} m={m} />
                   ))}
+                  {zeroMaterials.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setShowZeroMaterials((v) => !v)}
+                        className="flex w-full items-center gap-1 rounded py-0.5 text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        {showZeroMaterials ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                        未选用配件 {zeroMaterials.length} 项（数量为 0）
+                      </button>
+                      {showZeroMaterials && (
+                        <div className="space-y-1 opacity-60">
+                          {zeroMaterials.map((m, i) => (
+                            <MaterialLine key={`z-${i}`} m={m} />
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </div>
               )}
             </div>
           </CardContent>
         </Card>
 
-        {/* 财务（预估）— accent 强调；移动端置顶 */}
-        <Card className="relative order-first overflow-hidden lg:order-none">
+        {/* 财务对照卡：预估 | 实际 | 差异 一眼可比（此前分两卡需左右横跳） */}
+        <Card className="relative overflow-hidden lg:col-span-2">
           <span className="absolute left-0 top-4 bottom-4 w-1 rounded-r-full bg-accent" />
-          <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">财务（预估）</CardTitle></CardHeader>
-          <CardContent className="space-y-2 pl-4 text-sm">
-            <InfoRow label="材料成本" value={formatMoney(record.finance.materialCost)} />
-            <InfoRow label="安装费" value={formatMoney(record.finance.installFee)} />
-            <InfoRow label="运费" value={formatMoney(record.finance.freight)} />
-            <InfoRow label="预估成本" value={formatMoney(record.finance.estimatedCost)} />
-            <InfoRow label="实际售价" value={formatMoney(record.finance.actualPrice)} bold />
-            <InfoRow
-              label="预估利润"
-              value={formatMoney(record.finance.estimatedProfit)}
-              accent={record.finance.estimatedProfit >= 0 ? 'good' : 'bad'}
-            />
-            <InfoRow label="预估毛利率" value={`${record.finance.estimatedProfitRatePct}%`} />
-          </CardContent>
-        </Card>
-
-        {/* 发货信息 */}
-        <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="label-mono flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+            <CardTitle className="label-mono flex items-center gap-2 pl-3 text-xs font-semibold text-muted-foreground">
               <PackageCheck className="h-4 w-4" />
-              发货与实际财务
+              财务对照
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            {record.shipping ? (
+          <CardContent className="pl-3">
+            {!ship ? (
               <>
-                <InfoRow label="快递公司" value={record.shipping.courier} />
-                <InfoRow label="运单号" value={record.shipping.trackingNo} />
-                <InfoRow label="实际运费" value={formatMoney(record.shipping.actualFreight)} />
-                <InfoRow label="核对备注" value={record.shipping.checkRemark || '—'} />
-                <InfoRow label="确认时间" value={formatDateTime(record.shipping.confirmedAt)} />
-                <div className="my-2 border-t" />
-                <InfoRow label="实际成本" value={formatMoney(record.shipping.actualCost)} />
-                <InfoRow
-                  label="实际利润"
-                  value={formatMoney(record.shipping.actualProfit)}
-                  accent={record.shipping.actualProfit >= 0 ? 'good' : 'bad'}
+                <CompareTableHead actual={false} />
+                <CompareRow label="材料成本" estimated={formatMoney(fin.materialCost)} muted />
+                <CompareRow label="安装费" estimated={formatMoney(fin.installFee)} muted />
+                <CompareRow label="运费（预估）" estimated={formatMoney(fin.freight)} muted />
+                <CompareRow label="成本合计" estimated={formatMoney(fin.estimatedCost)} bold />
+                <CompareRow
+                  label="预估利润"
+                  estimated={formatMoney(fin.estimatedProfit)}
+                  valueClass={profitColor(fin.estimatedProfit)}
+                  bold
                 />
-                <InfoRow label="实际毛利率" value={`${record.shipping.actualProfitRatePct}%`} />
+                <CompareRow label="预估毛利率" estimated={`${fin.estimatedProfitRatePct}%`} />
+                <p className="mt-2 text-xs text-muted-foreground">未发货——确认发货并填写实际运费后，将在此展示实际成本、利润与差异。</p>
               </>
             ) : (
-              <div className="text-muted-foreground">未发货，发货后显示实际成本与利润</div>
+              <>
+                <CompareTableHead actual />
+                <CompareRow
+                  label="材料成本 + 安装费"
+                  estimated={formatMoney(fin.materialCost + fin.installFee)}
+                  actual={formatMoney(fin.materialCost + fin.installFee)}
+                />
+                <CompareRow
+                  label="运费"
+                  estimated={formatMoney(fin.freight)}
+                  actual={formatMoney(ship.actualFreight)}
+                  diff={ship.actualFreight - fin.freight}
+                  inverseDiff
+                />
+                <CompareRow
+                  label="成本合计"
+                  estimated={formatMoney(fin.estimatedCost)}
+                  actual={formatMoney(ship.actualCost)}
+                  diff={ship.actualCost - fin.estimatedCost}
+                  inverseDiff
+                  bold
+                />
+                <CompareRow
+                  label="利润"
+                  estimated={formatMoney(fin.estimatedProfit)}
+                  actual={formatMoney(ship.actualProfit)}
+                  diff={ship.actualProfit - fin.estimatedProfit}
+                  valueClassOverride={{ estimated: undefined, actual: profitColor(ship.actualProfit), diff: profitColor(ship.actualProfit - fin.estimatedProfit) }}
+                  bold
+                />
+                <CompareRow
+                  label="毛利率"
+                  estimated={`${fin.estimatedProfitRatePct}%`}
+                  actual={
+                    <span className={ship.actualProfit >= 0 ? '' : 'text-destructive'}>
+                      {ship.actualProfitRatePct}%
+                    </span>
+                  }
+                  diff={Number((ship.actualProfitRatePct - fin.estimatedProfitRatePct).toFixed(1))}
+                  isPercent
+                />
+                <div className="mt-3 space-y-2 border-t pt-3 text-sm">
+                  <InfoRow
+                    label="快递"
+                    value={
+                      <span className="inline-flex items-center gap-1.5">
+                        {ship.courier} · {ship.trackingNo}
+                        <button
+                          type="button"
+                          title="复制运单号"
+                          aria-label="复制运单号"
+                          onClick={() => handleCopyTracking(ship.trackingNo)}
+                          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </button>
+                      </span>
+                    }
+                  />
+                  {ship.checkRemark && <InfoRow label="核对备注" value={ship.checkRemark} />}
+                  <InfoRow label="确认时间" value={formatShortDateTime(ship.confirmedAt)} />
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -337,6 +431,7 @@ export function OrderDetailPage() {
             <Input
               value={shipForm.trackingNo}
               onChange={(e) => setShipForm((f) => ({ ...f, trackingNo: e.target.value }))}
+              placeholder="快递运单号"
             />
           </div>
           <NumberField
@@ -345,6 +440,7 @@ export function OrderDetailPage() {
             onChange={(v) => setShipForm((f) => ({ ...f, actualFreight: v }))}
             step={0.01}
             suffix="元"
+            displayDecimals={2}
           />
           <div className="space-y-1.5">
             <Label>核对备注</Label>
@@ -367,6 +463,82 @@ export function OrderDetailPage() {
   );
 }
 
+function MaterialLine({ m }: { m: { category: keyof typeof CATEGORY_LABEL; name: string; quantity: number; unitPrice: number } }) {
+  return (
+    <div className="flex justify-between tabular">
+      <span>
+        <span className="text-xs text-muted-foreground">[{CATEGORY_LABEL[m.category]}]</span> {m.name}
+      </span>
+      <span className="text-muted-foreground">
+        {m.quantity} × {formatMoney(m.unitPrice)}
+      </span>
+    </div>
+  );
+}
+
+function CompareTableHead({ actual }: { actual: boolean }) {
+  return (
+    <div className="mb-1 grid grid-cols-[minmax(0,1fr)_88px_88px_72px] items-center gap-2 border-b border-border pb-1 text-[10px] text-muted-foreground label-mono sm:grid-cols-[minmax(0,1fr)_110px_110px_90px]">
+      <div>项目</div>
+      <div className="text-right">预估</div>
+      <div className="text-right">{actual ? '实际' : '实际'}</div>
+      <div className="text-right">{actual ? '差异' : ''}</div>
+    </div>
+  );
+}
+
+function CompareRow({
+  label,
+  estimated,
+  actual,
+  diff,
+  bold,
+  muted,
+  valueClass,
+  valueClassOverride,
+  inverseDiff,
+  isPercent,
+}: {
+  label: string;
+  estimated: React.ReactNode;
+  /** 未发货时省略即显示 — */
+  actual?: React.ReactNode;
+  diff?: number;
+  bold?: boolean;
+  muted?: boolean;
+  /** 统一的文本色（默认前景色） */
+  valueClass?: string;
+  /** 分别覆盖 预估/实际/差异 三格配色 */
+  valueClassOverride?: { estimated?: string; actual?: string; diff?: string };
+  /** 成本类指标：差异 >0 为坏（红）；利润类反之。默认利好绿 */
+  inverseDiff?: boolean;
+  isPercent?: boolean;
+}) {
+  const weight = bold ? 'font-semibold' : muted ? 'font-normal text-muted-foreground' : '';
+  let diffNode: React.ReactNode = null;
+  if (diff !== undefined && Number.isFinite(diff)) {
+    const good = inverseDiff ? diff <= 0 : diff >= 0;
+    const sign = diff > 0 ? '+' : '';
+    diffNode = (
+      <span className={cn('tabular', good ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive')}>
+        {isPercent ? `${sign}${diff}pp` : `${sign}${formatMoney(diff)}`}
+      </span>
+    );
+  } else if (diff === undefined) {
+    diffNode = <span className="text-muted-foreground/40">—</span>;
+  }
+  return (
+    <div className="grid grid-cols-[minmax(0,1fr)_88px_88px_72px] items-center gap-2 border-b border-border/50 py-1.5 text-sm last:border-0 sm:grid-cols-[minmax(0,1fr)_110px_110px_90px]">
+      <span className={cn('text-muted-foreground', bold && 'font-medium text-foreground')}>{label}</span>
+      <span className={cn('text-right tabular', weight, valueClass ?? '', valueClassOverride?.estimated)}>{estimated}</span>
+      <span className={cn('text-right tabular', weight, actual == null ? 'text-muted-foreground/40' : '', valueClass ?? '', valueClassOverride?.actual)}>
+        {actual == null ? '—' : actual}
+      </span>
+      <span className="text-right text-xs">{diffNode}</span>
+    </div>
+  );
+}
+
 function InfoRow({
   label,
   value,
@@ -374,7 +546,7 @@ function InfoRow({
   accent,
 }: {
   label: string;
-  value: string;
+  value: React.ReactNode;
   bold?: boolean;
   accent?: 'good' | 'bad';
 }) {

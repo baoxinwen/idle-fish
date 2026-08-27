@@ -8,8 +8,7 @@ import { forwardRef, Fragment } from 'react';
 import { ThreeViews } from './three-views';
 import { C, MONO, SANS, PAGE_WIDTH } from './sheet-theme';
 
-/** 卖家信息（F-15）：图签栏与 footer 共用，单点维护 */
-const SELLER_NAME = '@包黑蛋';
+/** 卖家联系方式（F-15）：图签栏与 footer 共用。卖家名改为 settings.brand 可配置，见 sellerName prop */
 const SELLER_CONTACT = '15249983529';
 import type { QuoteRecord } from '@idlefish/shared';
 import { formatMoney, localDate } from '@/lib/utils';
@@ -17,6 +16,8 @@ import { COLOR_LABEL } from '@/lib/status';
 
 interface QuoteSheetProps {
   quote: QuoteRecord;
+  /** 卖家名称（settings.brand.sellerName）；缺省沿用旧内置值 */
+  sellerName?: string;
 }
 
 /** 报价有效期（天） */
@@ -234,7 +235,7 @@ function expiryDate(createdAt: string): string {
   return d.toLocaleDateString('en-CA');
 }
 
-export const QuoteSheet = forwardRef<HTMLDivElement, QuoteSheetProps>(({ quote }, _ref) => {
+export const QuoteSheet = forwardRef<HTMLDivElement, QuoteSheetProps>(({ quote, sellerName = '@包黑蛋' }, _ref) => {
   const b = quote.result.breakdown;
   const dateStr = localDate(quote.createdAt);
   const freightIncluded = b.freight > 0;
@@ -262,7 +263,7 @@ export const QuoteSheet = forwardRef<HTMLDivElement, QuoteSheetProps>(({ quote }
           <div style={S.seller}>
             <div style={S.sellerCell}>
               <div style={S.cellLabel}>卖家</div>
-              <div style={S.cellValueGold}>@包黑蛋</div>
+              <div style={S.cellValueGold}>{sellerName}</div>
             </div>
             <div style={S.sellerCellLast}>
               <div style={S.cellLabel}>联系方式</div>
@@ -390,7 +391,7 @@ export const QuoteSheet = forwardRef<HTMLDivElement, QuoteSheetProps>(({ quote }
       </div>
 
       <div style={S.footer}>
-        <span>卖家 {SELLER_NAME} · {SELLER_CONTACT}</span>
+        <span>卖家 {sellerName} · {SELLER_CONTACT}</span>
         <span>本报价单由系统生成</span>
       </div>
     </div>

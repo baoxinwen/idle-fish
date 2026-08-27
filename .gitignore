@@ -39,3 +39,8 @@ docs/
 
 # AI 协作指引（本地用，不上报）
 CLAUDE.md
+# zcode 会话工具产物
+.zcode/
+
+# TS 增量构建缓存
+*.tsbuildinfo

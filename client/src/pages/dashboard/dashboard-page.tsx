@@ -4,14 +4,15 @@
  */
 
 import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState, LoadingState } from '@/components/states';
-import { StatCard } from './stat-card';
+import { StatCard } from '@/components/ui/stat-card';
 import { statsApi } from '@/lib/api';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_BADGE, QUOTE_STATUS_LABEL } from '@/lib/status';
-import { formatMoney } from '@/lib/utils';
+import { formatMoney, formatCompactMoney, cn } from '@/lib/utils';
 import type { StatsData, StatsRange } from '@idlefish/shared';
 import {
   PieChart,
@@ -26,6 +27,7 @@ import {
   CartesianGrid,
   BarChart,
   Bar,
+  ReferenceLine,
 } from 'recharts';
 import type { TooltipProps } from 'recharts';
 import { FileText, Package, DollarSign, Target, BarChart3, AlertTriangle } from 'lucide-react';
@@ -43,12 +45,12 @@ const CHART = {
   slate: '#64748B', // 石板灰 - 辅助
 };
 
-// 状态色板：从主题派生，降低饱和度
+// 状态色板：从主题派生，降低饱和度；shipped 用更深的青色与墨蓝拉开距离
 const STATUS_COLORS: Record<string, string> = {
-  pending: '#94A3B8', // 灰
+  pending: '#64748B', // 石板灰
   producing: '#1E3A5F', // 墨蓝
   ready: '#C9A961', // 暖金
-  shipped: '#0891B2', // 青灰
+  shipped: '#0E7490', // 深青
   done: '#15803D', // 墨绿
   cancelled: '#B91C1C', // 暗红
 };
@@ -83,6 +85,7 @@ function formatDate(date: string, range: StatsRange): string {
 }
 
 export function DashboardPage() {
+  const navigate = useNavigate();
   const [data, setData] = useState<StatsData | null>(null);
   const [range, setRange] = useState<StatsRange>('30d');
   // F-06：错误态 + 手动重试（此前失败后永久停留「加载中…」且无重试路径）
@@ -153,9 +156,19 @@ export function DashboardPage() {
 
       {/* 指标卡：移动端 2 列，PC 4 列 */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="报价数" value={String(data.quoteCount)} hint={`总金额 ${formatMoney(data.quoteTotalAmount)}`} icon={FileText} />
+        <StatCard
+          label="报价数"
+          value={String(data.quoteCount)}
+          hint={`总金额 ${formatCompactMoney(data.quoteTotalAmount)}`}
+          icon={FileText}
+        />
         <StatCard label="转订单率" value={`${data.conversionRatePct}%`} icon={Target} />
-        <StatCard label="订单数" value={String(data.orderCount)} hint={`营收 ${formatMoney(data.orderRevenue)}`} icon={Package} />
+        <StatCard
+          label="订单数"
+          value={String(data.orderCount)}
+          hint={`总营收 ${formatCompactMoney(data.orderRevenue)}`}
+          icon={Package}
+        />
         <StatCard
           label="总利润"
           value={formatMoney(data.totalProfit)}
@@ -253,7 +266,13 @@ export function DashboardPage() {
                 <XAxis dataKey="date" tick={AXIS_TICK} tickFormatter={(d) => formatDate(d, range)} minTickGap={24} axisLine={false} tickLine={false} />
                 <YAxis tick={AXIS_TICK} width={32} axisLine={false} tickLine={false} />
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }} />
-                <Bar dataKey="profit" name="利润" fill={CHART.gold} radius={[4, 4, 0, 0]} maxBarSize={32} />
+                {/* 零基线：单笔亏损时整图只有负柱，无基线难以读值 */}
+                <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" />
+                <Bar dataKey="profit" name="利润" maxBarSize={32} radius={[4, 4, 0, 0]}>
+                  {data.trend.map((t) => (
+                    <Cell key={t.date} fill={t.profit >= 0 ? CHART.gold : '#B91C1C'} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -266,25 +285,38 @@ export function DashboardPage() {
           <CardHeader className="pb-2">
             <CardTitle className="label-mono font-semibold text-muted-foreground">最近报价</CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 pb-2">
             {data.recentQuotes.length === 0 ? (
               <div className="px-6 py-4 text-sm text-muted-foreground">暂无</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[280px] text-sm">
-                  <tbody>
-                    {data.recentQuotes.map((q) => (
-                      <tr key={q.id} className="border-b last:border-0">
-                        <td className="px-4 py-2 tabular font-medium">{q.quoteNo}</td>
-                        <td className="px-4 py-2 text-right tabular">{formatMoney(q.finalPrice)}</td>
-                        <td className="px-4 py-2 text-right">
-                          <span className="text-xs text-muted-foreground">{QUOTE_STATUS_LABEL[q.status]}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[280px] text-sm">
+                    <tbody>
+                      {data.recentQuotes.map((q) => (
+                        <tr
+                          key={q.id}
+                          onClick={() => navigate(`/quotes/${q.id}`)}
+                          className="cursor-pointer border-b transition-colors last:border-0 hover:bg-secondary/50"
+                        >
+                          <td className="px-4 py-2 tabular font-medium">{q.quoteNo}</td>
+                          <td className="px-4 py-2 text-right tabular">{formatMoney(q.finalPrice)}</td>
+                          <td className="px-4 py-2 text-right">
+                            <span className={cn('text-xs', q.status === 'converted' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')}>
+                              {QUOTE_STATUS_LABEL[q.status]}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-1 border-t px-4 pt-2 text-right">
+                  <Link to="/quotes" className="text-xs text-accent hover:underline">
+                    查看全部报价 →
+                  </Link>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -293,28 +325,39 @@ export function DashboardPage() {
           <CardHeader className="pb-2">
             <CardTitle className="label-mono font-semibold text-muted-foreground">最近订单</CardTitle>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 pb-2">
             {data.recentOrders.length === 0 ? (
               <div className="px-6 py-4 text-sm text-muted-foreground">暂无</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[360px] text-sm">
-                  <tbody>
-                    {data.recentOrders.map((o) => (
-                      <tr key={o.id} className="border-b last:border-0">
-                        <td className="px-4 py-2 tabular font-medium">{o.orderNo}</td>
-                        <td className="px-4 py-2 text-muted-foreground">{o.customerName || '—'}</td>
-                        <td className="px-4 py-2 text-right tabular">{formatMoney(o.actualPrice)}</td>
-                        <td className="px-4 py-2 text-right">
-                          <Badge variant={ORDER_STATUS_BADGE[o.status]} className="text-[10px]">
-                            {ORDER_STATUS_LABEL[o.status]}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[360px] text-sm">
+                    <tbody>
+                      {data.recentOrders.map((o) => (
+                        <tr
+                          key={o.id}
+                          onClick={() => navigate(`/orders/${o.id}`)}
+                          className="cursor-pointer border-b transition-colors last:border-0 hover:bg-secondary/50"
+                        >
+                          <td className="px-4 py-2 tabular font-medium">{o.orderNo}</td>
+                          <td className="px-4 py-2 text-muted-foreground">{o.customerName || '—'}</td>
+                          <td className="px-4 py-2 text-right tabular">{formatMoney(o.actualPrice)}</td>
+                          <td className="px-4 py-2 text-right">
+                            <Badge variant={ORDER_STATUS_BADGE[o.status]} className="text-[10px]">
+                              {ORDER_STATUS_LABEL[o.status]}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-1 border-t px-4 pt-2 text-right">
+                  <Link to="/orders" className="text-xs text-accent hover:underline">
+                    查看全部订单 →
+                  </Link>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

@@ -4,7 +4,9 @@ import { FileText, Package, BarChart3, Settings, LogOut, Menu, X, Search } from 
 import { ThemeToggle } from './theme-toggle';
 import { CommandPalette } from './command-palette';
 import { Button } from './ui/button';
+import { Kbd } from './ui/kbd';
 import { useAuthStore } from '@/store/auth-store';
+import { modKeyLabel } from '@/lib/platform';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -111,10 +113,6 @@ export function AppLayout() {
             >
               <Menu className="h-5 w-5" />
             </Button>
-            {/* 流程文案仅 PC 显示 */}
-            <div className="label-mono hidden text-muted-foreground lg:block">
-              报价 → 订单 → 生产 → 发货
-            </div>
           </div>
           <div className="flex items-center gap-2">
             {/* ⌘K 命令面板触发（PC） */}
@@ -126,7 +124,7 @@ export function AppLayout() {
             >
               <Search className="h-3.5 w-3.5" />
               搜索
-              <kbd className="rounded border bg-muted px-1 text-[10px]">⌘K</kbd>
+              <Kbd>{modKeyLabel()} K</Kbd>
             </Button>
             <ThemeToggle />
             <Button

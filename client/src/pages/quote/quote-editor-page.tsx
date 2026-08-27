@@ -1,25 +1,25 @@
 /**
  * 报价新建/编辑页：左表单 + 右上 3D 预览 + 右下成本明细。
+ * 移动端由底部 PriceActionBar 常驻最终报价与保存按钮。
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Save, ArrowLeft, Download, FilePlus } from 'lucide-react';
+import { Save, ArrowLeft, Download, FilePlus, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { NumberField } from '@/components/number-field';
 import { QuoteForm } from '@/components/quote-form/quote-form';
 import { Cabinet3D } from '@/components/cabinet-3d/cabinet-3d';
 import { CostSummary } from '@/components/cost-summary/cost-summary';
+import { PriceActionBar } from '@/components/price-action-bar';
 import { ExportDialog } from '@/components/export/export-dialog';
 import { Modal } from '@/components/ui/modal';
 import { LoadingState } from '@/components/states';
+import { ConvertQuoteDialog, useConvertQuote } from '@/components/quote-form/convert-dialog';
 import { useQuoteStore } from '@/store/quote-store';
 import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
-import { emptyConvertForm, type ConvertConfirmForm } from '@/lib/convert-form';
 import { useToast } from '@/components/toaster';
 import { quotesApi, settingsApi } from '@/lib/api';
+import { formatMoney } from '@/lib/utils';
 import { calcQuote, type QuoteRecord, type Settings } from '@idlefish/shared';
 
 export function QuoteEditorPage() {
@@ -30,11 +30,15 @@ export function QuoteEditorPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
   const [exportQuote, setExportQuote] = useState<QuoteRecord | null>(null);
-  // 转订单弹窗
-  const [convertOpen, setConvertOpen] = useState(false);
-  const [converting, setConverting] = useState(false);
-  // F-13：转单确认表单形状与 order-editor 共用 lib/convert-form
-  const [convertForm, setConvertForm] = useState<ConvertConfirmForm>(emptyConvertForm);
+  // 3D 预览在移动端默认折叠，长表单不用滚过整块画布
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
+
+  const convert = useConvertQuote((orderId, orderNo) => {
+    toast(`已转单：${orderNo}`);
+    clearDirty();
+    setDirty(false);
+    navigate(`/orders/${orderId}`, { replace: true });
+  });
 
   // 未保存修改跟踪：baseline 是上次加载/保存的 input 快照，input 变化与之比较
   const baselineRef = useRef<string>('');
@@ -79,8 +83,7 @@ export function QuoteEditorPage() {
           reset(s);
         }
       } catch (e) {
-        // M6：此前内层 promise 未 return/catch，坏 id（已删除/404/500）会永久卡 LoadingState
-        // 且产生 unhandledrejection。现在统一兜底：提示后回列表（终止态），不再无限转圈。
+        // M6：坏 id（已删除/404/500）统一兜底：提示后回列表（终止态），不再无限转圈。
         if (cancelled) return;
         toast(`加载失败：${e}`);
         navigate('/quotes', { replace: true });
@@ -122,73 +125,33 @@ export function QuoteEditorPage() {
   }
 
   /** 打开转单弹窗前，确保报价已保存（新建未保存 / 有未保存修改都先存） */
-  async function ensureSaved(): Promise<string | null> {
-    if (editingId && !dirty) return editingId; // 已存且无修改
+  async function openConvert() {
     setSaving(true);
+    let savedId: string | null = null;
     try {
       if (editingId) {
         await quotesApi.update(editingId, input);
+        savedId = editingId;
+      } else {
+        const record = await quotesApi.create(input);
+        savedId = record.id;
         justLoaded.current = true;
-        baselineRef.current = JSON.stringify(input);
-        setDirty(false);
-        clearDirty();
-        return editingId;
+        loadFromRecord(record.input, record.id, record.status);
+        navigate(`/quotes/${record.id}`, { replace: true });
       }
-      // 新建：create 拿 id
-      const record = await quotesApi.create(input);
       justLoaded.current = true;
-      loadFromRecord(record.input, record.id, record.status);
+      baselineRef.current = JSON.stringify(input);
+      setDirty(false);
       clearDirty();
-      return record.id;
     } catch (e) {
       toast(`保存失败：${e}`);
-      return null;
     } finally {
       setSaving(false);
     }
+    if (savedId) convert.start({ id: savedId, input });
   }
 
-  async function handleConvertSubmit() {
-    if (!convertForm.customer.name.trim()) {
-      toast('请填写客户名称');
-      return;
-    }
-    const quoteId = await ensureSaved();
-    if (!quoteId) return;
-    setConverting(true);
-    try {
-      const res = await quotesApi.convert(quoteId, {
-        customer: convertForm.customer,
-        shippingAddress: convertForm.shippingAddress,
-        remark: convertForm.remark,
-        finance: convertForm.finance,
-      });
-      toast(`已转单：${res.orderNo}`);
-      justLoaded.current = true;
-      setDirty(false);
-      clearDirty();
-      setConvertOpen(false);
-      navigate(`/orders/${res.orderId}`, { replace: true });
-    } catch (e) {
-      toast(`转单失败：${e}`);
-    } finally {
-      setConverting(false);
-    }
-  }
-
-  function openConvert() {
-    const result = calcQuote(input);
-    setConvertForm({
-      ...emptyConvertForm(),
-      finance: {
-        materialCost: result.breakdown.materialCost,
-        installFee: result.breakdown.installFee,
-        freight: result.breakdown.freight,
-        actualPrice: result.finalPrice,
-      },
-    });
-    setConvertOpen(true);
-  }
+  const statusLabel = editingStatus === 'converted';
 
   return (
     <div className="space-y-4">
@@ -201,7 +164,9 @@ export function QuoteEditorPage() {
           <div>
             <div className="label-mono text-[10px] text-accent">QUOTE · 报价</div>
             <h1 className="text-xl font-bold">{editingId ? '编辑报价' : '新建报价'}</h1>
-            {editingId && <p className="hidden text-xs text-muted-foreground sm:block">修改后保存将更新此报价</p>}
+            {editingId && !statusLabel && (
+              <p className="hidden text-xs text-muted-foreground sm:block">修改后保存将更新此报价</p>
+            )}
           </div>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
@@ -233,13 +198,13 @@ export function QuoteEditorPage() {
             variant="outline"
             className="shrink-0"
             onClick={openConvert}
-            disabled={saving || converting || editingStatus === 'converted'}
-            title={editingStatus === 'converted' ? '该报价已转为订单' : undefined}
+            disabled={saving || convert.converting || statusLabel}
+            title={statusLabel ? '该报价已转为订单' : undefined}
           >
             <FilePlus className="h-4 w-4" />
-            {editingStatus === 'converted' ? '已转单' : '转订单'}
+            {statusLabel ? '已转单' : '转订单'}
           </Button>
-          <Button variant="accent" className="shrink-0" onClick={handleSave} disabled={saving}>
+          <Button variant="accent" className="hidden lg:inline-flex" onClick={handleSave} disabled={saving}>
             <Save className="h-4 w-4" />
             {saving ? '保存中…' : '保存'}
           </Button>
@@ -252,8 +217,20 @@ export function QuoteEditorPage() {
 
         {/* 右：3D + 成本明细，PC sticky 滚动表单时固定可见 */}
         <div className="space-y-4 lg:sticky lg:top-16 lg:self-start">
-          {/* 3D 预览：工程蓝图风背景 + 顶部标签 + 右下尺寸参考 */}
-          <div className="relative h-[260px] overflow-hidden rounded-lg border bg-[radial-gradient(circle_at_50%_40%,#1E3A5F_0%,#0B1220_100%)] p-2 lg:h-[340px]">
+          {/* 移动端折叠的 3D 预览 */}
+          <button
+            type="button"
+            className="flex w-full items-center justify-between rounded-lg border bg-card px-4 py-2.5 text-sm font-medium lg:hidden"
+            onClick={() => setMobilePreviewOpen((v) => !v)}
+          >
+            <span className="label-mono text-xs text-muted-foreground">3D 预览 · 可拖拽旋转</span>
+            {mobilePreviewOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          </button>
+          <div
+            className={`relative h-[260px] overflow-hidden rounded-lg border bg-[radial-gradient(circle_at_50%_40%,#1E3A5F_0%,#0B1220_100%)] p-2 lg:block lg:h-[340px] ${
+              mobilePreviewOpen ? 'block' : 'hidden'
+            }`}
+          >
             {/* 细网格线（蓝图感） */}
             <div
               className="pointer-events-none absolute inset-0 opacity-20"
@@ -298,103 +275,35 @@ export function QuoteEditorPage() {
         </div>
       </Modal>
 
-      {/* 转订单弹窗：填客户/收货信息并确认价格，提交时自动保存报价再转单 */}
-      <Modal
-        open={convertOpen}
-        onClose={() => !converting && setConvertOpen(false)}
-        title="报价转订单"
-      >
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            转单将自动保存当前报价。请逐项确认材料成本、安装费、运费与实际售价后创建订单。
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            <NumberField
-              label="材料成本"
-              value={convertForm.finance.materialCost}
-              onChange={(v) => setConvertForm((f) => ({ ...f, finance: { ...f.finance, materialCost: v } }))}
-              step={0.01}
-              suffix="元"
-            />
-            <NumberField
-              label="安装费"
-              value={convertForm.finance.installFee}
-              onChange={(v) => setConvertForm((f) => ({ ...f, finance: { ...f.finance, installFee: v } }))}
-              step={0.01}
-              suffix="元"
-            />
-            <NumberField
-              label="运费"
-              value={convertForm.finance.freight}
-              onChange={(v) => setConvertForm((f) => ({ ...f, finance: { ...f.finance, freight: v } }))}
-              step={0.01}
-              suffix="元"
-            />
-            <NumberField
-              label="实际售价"
-              value={convertForm.finance.actualPrice}
-              onChange={(v) => setConvertForm((f) => ({ ...f, finance: { ...f.finance, actualPrice: v } }))}
-              step={0.01}
-              suffix="元"
-            />
-          </div>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label>客户名称 *</Label>
-              <Input
-                value={convertForm.customer.name}
-                onChange={(e) => setConvertForm((f) => ({ ...f, customer: { ...f.customer, name: e.target.value } }))}
-                placeholder="客户名称"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>平台订单号</Label>
-              <Input
-                value={convertForm.customer.platformOrderNo}
-                onChange={(e) => setConvertForm((f) => ({ ...f, customer: { ...f.customer, platformOrderNo: e.target.value } }))}
-                placeholder="如淘宝/京东订单号"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>收件人</Label>
-                <Input
-                  value={convertForm.shippingAddress.receiver}
-                  onChange={(e) => setConvertForm((f) => ({ ...f, shippingAddress: { ...f.shippingAddress, receiver: e.target.value } }))}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>电话</Label>
-                <Input
-                  value={convertForm.shippingAddress.phone}
-                  onChange={(e) => setConvertForm((f) => ({ ...f, shippingAddress: { ...f.shippingAddress, phone: e.target.value } }))}
-                />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label>收货地址</Label>
-              <Input
-                value={convertForm.shippingAddress.address}
-                onChange={(e) => setConvertForm((f) => ({ ...f, shippingAddress: { ...f.shippingAddress, address: e.target.value } }))}
-                placeholder="省市区详细地址"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label>备注</Label>
-              <Input
-                value={convertForm.remark}
-                onChange={(e) => setConvertForm((f) => ({ ...f, remark: e.target.value }))}
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setConvertOpen(false)} disabled={converting}>取消</Button>
-            <Button onClick={handleConvertSubmit} disabled={converting || saving}>
-              {converting || saving ? '转单中…' : '确认转单'}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {/* 转订单确认弹窗（列表/编辑器共用） */}
+      <ConvertQuoteDialog
+        target={convert.target}
+        form={convert.form}
+        setForm={convert.setForm}
+        preparing={saving}
+        converting={convert.converting}
+        onSubmit={convert.submit}
+        onClose={convert.close}
+      />
+
+      {/* 移动端底部常驻价格条 */}
+      <QuoteMobilePriceBar onSave={handleSave} saving={saving} />
     </div>
+  );
+}
+
+/** 报价页移动端价格条内容：实时最终报价 + 总成本提示 */
+function QuoteMobilePriceBar({ onSave, saving }: { onSave: () => void; saving: boolean }) {
+  const input = useQuoteStore((s) => s.input);
+  const result = useMemo(() => calcQuote(input), [input]);
+  return (
+    <PriceActionBar
+      value={result.finalPrice}
+      label="最终报价"
+      hint={`总成本 ${formatMoney(result.breakdown.totalCost)} · 毛利率 ${result.profitRatePct}%`}
+      danger={result.expectedProfit < 0}
+      onSave={onSave}
+      saving={saving}
+    />
   );
 }

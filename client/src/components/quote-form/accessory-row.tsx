@@ -1,8 +1,17 @@
+/**
+ * 配件表格行。
+ * sm+：CSS Grid 固定列模板（名称自适应 + 数量/单价/小计/删除定宽）——
+ *   旧版 flex-wrap 下「可编辑名称 Input 的 w-full 假想宽度」会把删除按钮挤到第二行，此处以模板根治。
+ * 移动端：名称整行，数量/单价/小计/删除同行；两套布局均为受控绑定同一 item。
+ */
+
 import { Trash2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatMoney } from '@/lib/utils';
 import type { AccessoryItem } from '@idlefish/shared';
+
+/** M10/F-03：输入收敛统一走 lib/input-sanitize，杜绝 Infinity 与负单价流入实时计价 */
+import { toCount, toPrice } from '@/lib/input-sanitize';
 
 interface AccessoryRowProps {
   item: AccessoryItem;
@@ -15,73 +24,124 @@ interface AccessoryRowProps {
   showRemove?: boolean;
 }
 
-/**
- * 配件表格行：PC 与父容器表头列对齐（无内部 label）+ 行分隔线；
- * 移动端保留 label 并换行。
- */
-/** M10/F-03：输入收敛统一走 lib/input-sanitize，杜绝 Infinity 与负单价流入实时计价 */
-import { toCount, toPrice } from '@/lib/input-sanitize';
-
 export function AccessoryRow({ item, index, onUpdate, onRemove, nameEditable, showRemove = true }: AccessoryRowProps) {
-  const subtotal = item.quantity * item.unitPrice;
+  const patch = (p: Partial<AccessoryItem>) => onUpdate(index, p);
+  const remove = onRemove ? () => onRemove(index) : undefined;
 
   return (
-    <div className="flex flex-wrap items-end gap-2 border-b border-border/60 py-2 last:border-0 sm:py-1.5">
-      {/* 名称 */}
-      <div className="min-w-0 flex-1 basis-full sm:basis-auto">
-        <label className="mb-1 block text-xs text-muted-foreground sm:hidden">名称</label>
+    <>
+      {/* 移动端 */}
+      <div className="border-b border-border/60 py-2 last:border-0 sm:hidden">
+        <label className="mb-1 block text-xs text-muted-foreground">名称</label>
         {nameEditable ? (
           <Input
             value={item.name}
-            onChange={(e) => onUpdate(index, { name: e.target.value })}
+            onChange={(e) => patch({ name: e.target.value })}
             className="h-8"
+            aria-label="配件名称"
           />
         ) : (
           <div className="flex h-8 items-center truncate text-sm">{item.name}</div>
         )}
-      </div>
-      {/* 数量 */}
-      <div className="w-20 shrink-0">
-        <label className="mb-1 block text-xs text-muted-foreground sm:hidden">数量</label>
-        <input
-          type="number"
-          min={0}
-          step={1}
-          value={item.quantity}
-          onChange={(e) => onUpdate(index, { quantity: toCount(e.target.value) })}
-          className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular"
-        />
-      </div>
-      {/* 单价 */}
-      <div className="w-24 shrink-0">
-        <label className="mb-1 block text-xs text-muted-foreground sm:hidden">单价</label>
-        <input
-          type="number"
-          min={0}
-          step={0.01}
-          value={item.unitPrice}
-          onChange={(e) => onUpdate(index, { unitPrice: toPrice(e.target.value) })}
-          className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular"
-        />
-      </div>
-      {/* 小计 */}
-      <div className="w-24 shrink-0">
-        <label className="mb-1 block text-xs text-muted-foreground sm:hidden">小计</label>
-        <div className="flex h-8 items-center justify-end rounded-md bg-muted/50 px-2 text-sm font-medium tabular">
-          {formatMoney(subtotal)}
+        <div
+          className="mt-2 grid items-end gap-2"
+          style={{ gridTemplateColumns: '72px 88px minmax(0,1fr) auto' }}
+        >
+          <NumCell label="数量" value={item.quantity} onChange={(v) => patch({ quantity: toCount(String(v)) })} />
+          <NumCell label="单价" value={item.unitPrice} decimal onChange={(v) => patch({ unitPrice: toPrice(String(v)) })} />
+          <SubtotalCell value={item.quantity * item.unitPrice} />
+          <RemoveCell showRemove={showRemove} onRemove={remove} />
         </div>
       </div>
-      {showRemove && onRemove && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => onRemove(index)}
-          className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-          title="删除"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      )}
+
+      {/* sm+：固定五列网格 */}
+      <div
+        className="hidden items-center gap-2 border-b border-border/60 py-1.5 last:border-0 sm:grid"
+        style={{ gridTemplateColumns: 'minmax(0,1fr) 72px 88px 88px 32px' }}
+      >
+        <div className="min-w-0">
+          {nameEditable ? (
+            <Input
+              value={item.name}
+              onChange={(e) => patch({ name: e.target.value })}
+              className="h-8"
+              aria-label="配件名称"
+            />
+          ) : (
+            <div className="flex h-8 items-center truncate text-sm">{item.name}</div>
+          )}
+        </div>
+        <NumCell label="数量" value={item.quantity} onChange={(v) => patch({ quantity: toCount(String(v)) })} compact />
+        <NumCell label="单价" value={item.unitPrice} decimal onChange={(v) => patch({ unitPrice: toPrice(String(v)) })} compact />
+        <SubtotalCell value={item.quantity * item.unitPrice} compact />
+        <RemoveCell showRemove={showRemove} onRemove={remove} alignRight />
+      </div>
+    </>
+  );
+}
+
+function NumCell({
+  label,
+  value,
+  decimal,
+  compact,
+  onChange,
+}: {
+  label?: string;
+  value: number;
+  /** 单价允许两位小数步进 */
+  decimal?: boolean;
+  /** sm+ 网格内：无 label（表头行已说明列含义） */
+  compact?: boolean;
+  onChange: (v: number) => void;
+}) {
+  return (
+    <div>
+      {!compact && <label className="mb-1 block text-xs text-muted-foreground">{label}</label>}
+      <input
+        type="number"
+        min={0}
+        step={decimal ? 0.01 : 1}
+        value={value}
+        onFocus={(e) => e.target.select()}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label={compact ? label : undefined}
+        className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+      />
     </div>
+  );
+}
+
+function SubtotalCell({ value, compact }: { value: number; compact?: boolean }) {
+  return (
+    <div>
+      {!compact && <label className="mb-1 block text-xs text-muted-foreground">小计</label>}
+      <div className="flex h-8 items-center justify-end rounded-md bg-muted/50 px-2 text-sm font-medium tabular">
+        {formatMoney(value)}
+      </div>
+    </div>
+  );
+}
+
+function RemoveCell({
+  showRemove,
+  onRemove,
+  alignRight,
+}: {
+  showRemove: boolean;
+  onRemove?: () => void;
+  alignRight?: boolean;
+}) {
+  if (!showRemove || !onRemove) return <span className={alignRight ? '' : 'w-8'} />;
+  return (
+    <button
+      type="button"
+      onClick={onRemove}
+      title="删除"
+      aria-label="删除"
+      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${alignRight ? 'justify-self-end' : ''}`}
+    >
+      <Trash2 className="h-3.5 w-3.5" />
+    </button>
   );
 }
