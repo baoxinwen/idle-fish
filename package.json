@@ -25,6 +25,9 @@
     "onlyBuiltDependencies": [
       "better-sqlite3",
       "esbuild"
-    ]
+    ],
+    "overrides": {
+      "nanoid@^3": "^3.3.18"
+    }
   }
 }
