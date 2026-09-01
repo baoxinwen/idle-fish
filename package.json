@@ -2,6 +2,7 @@
   "name": "idlefish",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "铝型材机柜报价工具",
   "scripts": {
     "dev": "pnpm --filter @idlefish/shared build && concurrently -n server,client -c blue,magenta \"pnpm --filter @idlefish/server dev\" \"pnpm --filter @idlefish/client dev\"",
