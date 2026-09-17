@@ -22,9 +22,12 @@ import type {
 import { SIZE_GAP } from './types.js';
 
 /** 金额舍入到分（2 位小数）。用 Math.round + 1e-9 修正浮点误差，
- *  严格四舍五入（1.005→1.01、2.675→2.68），非 toFixed 的「对半值趋向偶数」。 */
+ *  严格四舍五入（1.005→1.01、2.675→2.68），非 toFixed 的「对半值趋向偶数」。
+ *  M-8：负数取绝对值后舍入再还原符号——对半值远离零（-0.045→-0.05），
+ *  与正数域口径对称；Math.round(-4.5) 向 +∞ 得 -4 是此前的缺陷。 */
 export function roundMoney(value: number): number {
-  return Math.round(value * 100 + 1e-9) / 100;
+  const rounded = Math.round(Math.abs(value) * 100 + 1e-9) / 100;
+  return value < 0 ? -rounded : rounded;
 }
 
 /** 按颜色取型材单价 */

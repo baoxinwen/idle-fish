@@ -53,6 +53,18 @@ describe('roundMoney', () => {
     assert.equal(roundMoney(2.675), 2.68);
     assert.equal(roundMoney(0.125), 0.13);
   });
+
+  it('负数对半值同样严格四舍五入（远离零，M-8）', () => {
+    // 亏损单毛利率：roundMoney(-0.045) 应为 -0.05（Math.round 对 -4.5 向 +∞ 得 -4 → -0.04 是缺陷）
+    assert.equal(roundMoney(-0.045), -0.05);
+    assert.equal(roundMoney(-1.005), -1.01);
+    assert.equal(roundMoney(-2.675), -2.68);
+    // 负数非对半值不受影响
+    assert.equal(roundMoney(-1.234), -1.23);
+    // 零与 -0 边界
+    assert.equal(roundMoney(0), 0);
+    assert.equal(roundMoney(-0.001), -0);
+  });
 });
 
 describe('toInnerSize', () => {
