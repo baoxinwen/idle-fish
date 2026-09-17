@@ -1,5 +1,5 @@
-# IdleFish — Docker 镜像自动构建
-# push 到 main 时构建并推送至 ghcr.io/baoxinwen/idlefish
+# idle-fish — Docker 镜像自动构建
+# push 到 main 时构建并推送至 ghcr.io/baoxinwen/idle-fish
 # 标签：latest + git short sha
 
 name: Build and Push Docker Image
@@ -11,10 +11,35 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: idlefish
+  IMAGE_NAME: idle-fish
 
 jobs:
+  # I-7：测试门禁——计价引擎/server/client 的单元测试不过，不构建不发布
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.18.1 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: |
+          pnpm --filter @idle-fish/shared test
+          pnpm --filter @idle-fish/server test
+          pnpm --filter @idle-fish/client test
+
   build-and-push:
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -39,7 +64,7 @@ jobs:
         run: |
           echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           # 镜像全名小写
-          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/idlefish" >> $GITHUB_OUTPUT
+          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/idle-fish" >> $GITHUB_OUTPUT
 
       - name: Build and push
         uses: docker/build-push-action@v6
