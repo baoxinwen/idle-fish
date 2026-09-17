@@ -15,9 +15,10 @@ import {
   type AccessoryItem,
   type QuoteInput,
   type QuoteRecord,
-} from '@idlefish/shared';
+} from '@idle-fish/shared';
 import { getDb } from '../db/index.js';
 import { nextBusinessNo, nowIso } from '../lib/no.js';
+import { singleQueryParam } from '../lib/query.js';
 import { insertOrder } from '../lib/insert-order.js';
 import { log } from '../lib/logger.js';
 import { HttpError, sendTxError } from '../lib/http-error.js';
@@ -36,11 +37,15 @@ interface QuoteRow {
 
 // 列表查询
 quotesRouter.get('/', (req, res) => {
-  const { status } = req.query;
+  const status = singleQueryParam(req.query.status);
+  // I-1：数组/对象形态（qs 扩展解析产物）在此收口为 400，不直达 SQL
+  if (status === null) {
+    return res.status(400).json({ error: '参数校验失败' });
+  }
   const db = getDb();
   const rows = (
     status
-      ? db.prepare('SELECT * FROM quotes WHERE status = ? ORDER BY created_at DESC').all(status as string)
+      ? db.prepare('SELECT * FROM quotes WHERE status = ? ORDER BY created_at DESC').all(status)
       : db.prepare('SELECT * FROM quotes ORDER BY created_at DESC').all()
   ) as QuoteRow[];
 
