@@ -34,6 +34,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # @idle-fish/shared 的包入口指向 dist/，client 测试引用其运行时导出前需先构建
+      - name: Build shared
+        run: pnpm --filter @idle-fish/shared build
+
       - name: Run tests
         run: |
           pnpm --filter @idle-fish/shared test
