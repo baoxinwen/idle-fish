@@ -1,7 +1,55 @@
 # 更新日志
 
-本文件记录 IdleFish 的显著变更。版本号遵循
+本文件记录 idle-fish 的显著变更。版本号遵循
 [语义化版本](https://semver.org/lang/zh-CN/)。
+
+## [Unreleased]
+
+### 破坏性变更
+
+- 项目更名为 idle-fish（原 IdleFish）：npm 包作用域 `@idlefish/*` 改为
+  `@idle-fish/*`，环境变量前缀 `IDLEFISH_` 改为 `IDLE_FISH_`（如
+  `IDLEFISH_DATA_DIR` → `IDLE_FISH_DATA_DIR`），Docker 镜像改为
+  `ghcr.io/baoxinwen/idle-fish`，容器与数据卷名同步调整
+- 数据库文件名 `idlefish.db` 改为 `idle-fish.db`。代码已内置一次性自动迁移
+  （启动时若存在旧文件则自动改名），存量部署数据不受影响；备份文件前缀
+  `idlefish-backup-*` / `idlefish-before-restore-*` 同步改为 `idle-fish-*`
+- 会话 cookie 名改为 `idle-fish-session`，升级后所有用户需重新登录一次
+
+### 修复
+
+- 局域网 `http://<IP>:3000` 直访登录成功后立刻掉线回登录页：原因是生产环境
+  会话 cookie 一律带 Secure 标志，浏览器在非 localhost 的 HTTP 下会丢弃。
+  现改为按实际连接自适应（HTTPS 访问自动带 Secure，经反代时取
+  `X-Forwarded-Proto` 判定），`IDLE_FISH_COOKIE_SECURE=1|0` 保留为强制覆盖
+- **恢复失败回滚不再用残缺副本覆盖完好原库**（2026-09-17 评审 C-1）：自动备份
+  复制中途失败（如磁盘满）时保留原库，仅清理残缺副本
+- **配件行数量/单价可正常逐键输入小数**（C-2）：受控 number 输入的净化中间态
+  不再以 0 回写擦除输入（此前 "12.5" 会落库为 5）
+- **重进同一报价后保存恢复可用**（C-3）：跳过加载分支补拉计价参数，
+  保存不再静默失效
+- 列表接口 status 查询参数收口（I-1）：数组/对象形态回 400 而非 500
+- 保存后的第一次修改重新受「未保存」离开守卫保护（I-2）
+- 设置保存在途编辑不再被静默吞掉（I-3）
+- NumberField 非法中间态不再实时归零、尾点失焦不再以 0 覆盖原值（I-4）
+- 订单编辑器/设置页/订单详情加载失败显示可重试的终止态（I-5）
+- 已转单报价禁用保存并明示只读（I-6）
+- setup 并发竞态返回 409 而非 500（M-4）；非字符串 setup token 返回 403
+  而非 500（M-5）
+- roundMoney 负数对半值远离零，亏损单毛利率显示与正数域口径对称（M-8）
+- 导出弹窗类型切换在导出期间禁用（M-11）；卖家名改动即时生效（M-12）；
+  报价图配置摘要消除右侧留白（M-13）；已发货订单不再显示「取消订单」（M-15）；
+  转单场景 fromQuote 切换首帧旧数据窗口关闭（M-16）
+- 恢复请求包 asyncHandler 防悬挂（M-1）；导出 tmp 快照崩溃残留启动清扫（M-2）；
+  导出被客户端取消降为 info 日志（M-3）；README 自建镜像指引改为可执行的
+  docker build 步骤（M-14）
+
+### 工程
+
+- CI 新增测试门禁：shared/server/client 单元测试通过才构建推送镜像（I-7）
+- 引入前端测试设施：vitest + jsdom + Testing Library（client devDeps），
+  tsx 测试运行器（server/client devDeps），覆盖评审 C-1/C-2/C-3/I-1~I-4
+  的回归用例
 
 ## [0.1.0] - 2026-09-01
 
