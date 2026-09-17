@@ -10,7 +10,7 @@ import { C, MONO, SANS, PAGE_WIDTH } from './sheet-theme';
 
 /** 卖家联系方式（F-15）：图签栏与 footer 共用。卖家名改为 settings.brand 可配置，见 sellerName prop */
 const SELLER_CONTACT = '15249983529';
-import type { QuoteRecord } from '@idlefish/shared';
+import type { QuoteRecord } from '@idle-fish/shared';
 import { formatMoney, localDate } from '@/lib/utils';
 import { COLOR_LABEL } from '@/lib/status';
 
@@ -121,7 +121,7 @@ const S = {
   summary: {
     margin: `14px ${PX}px 0`,
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr 1fr 1fr',
+    gridTemplateColumns: '1fr 1fr 1fr', // M-13：单元格只有 3 个（费用项收起后），4 列声明导致右侧 1/4 空白
     gap: 0,
     background: C.cardBg,
     border: `1px solid ${C.line}`,

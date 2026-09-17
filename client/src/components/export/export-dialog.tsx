@@ -13,7 +13,7 @@ import { PAGE_WIDTH } from './sheet-theme';
 import { useToast } from '@/components/toaster';
 import { settingsApi } from '@/lib/api';
 import { exportNodeAsPng, exportNodeAsPdf, exportQuoteExcel } from '@/lib/export';
-import type { QuoteRecord } from '@idlefish/shared';
+import type { QuoteRecord } from '@idle-fish/shared';
 import { FileImage, FileType, FileSpreadsheet, Download } from 'lucide-react';
 
 interface ExportDialogProps {
@@ -24,9 +24,6 @@ interface ExportDialogProps {
 
 type SheetType = 'quote' | 'production';
 
-/** 会话级缓存：避免每次打开都等一次 settings 往返 */
-let cachedSellerName: string | null = null;
-
 export function ExportDialog({ open, onClose, quote }: ExportDialogProps) {
   const [type, setType] = useState<SheetType>('quote');
   /** 导出节点：保持原始尺寸，供 html-to-image 截取 */
@@ -36,16 +33,17 @@ export function ExportDialog({ open, onClose, quote }: ExportDialogProps) {
   const [scale, setScale] = useState(0.5);
   const toast = useToast((s) => s.show);
   const [busy, setBusy] = useState(false);
-  const [sellerName, setSellerName] = useState(cachedSellerName ?? '@包黑蛋');
+  // M-12：不再做会话级缓存——改卖家名后导出仍用旧名的陈旧窗口无法接受；
+  // 每次打开弹窗拉一次 settings（单用户工具，往返开销可忽略），失败沿用默认值
+  const [sellerName, setSellerName] = useState('@包黑蛋');
 
-  // 打开时补拉品牌信息（失败沿用默认值）
+  // 打开时拉取品牌信息
   useEffect(() => {
-    if (!open || cachedSellerName) return;
+    if (!open) return;
     let cancelled = false;
     settingsApi
       .get()
       .then((s) => {
-        cachedSellerName = s.brand.sellerName;
         if (!cancelled) setSellerName(s.brand.sellerName);
       })
       .catch(() => {});
@@ -112,13 +110,24 @@ export function ExportDialog({ open, onClose, quote }: ExportDialogProps) {
   return (
     <Modal open={open} onClose={onClose} title={`导出 · ${quote?.quoteNo ?? ''}`} size="xl">
       <div className="space-y-3">
-        {/* 类型切换 */}
+        {/* 类型切换（M-11：导出进行中禁用——首次导出含动态 import，期间切换
+            会导致文件名在点击时定型而内容在克隆时定型，二者可能不符） */}
         <div className="flex gap-1">
-          <Button variant={type === 'quote' ? 'default' : 'outline'} size="sm" onClick={() => setType('quote')}>
+          <Button
+            variant={type === 'quote' ? 'default' : 'outline'}
+            size="sm"
+            disabled={busy}
+            onClick={() => setType('quote')}
+          >
             <FileImage className="h-3.5 w-3.5" />
             客户报价图
           </Button>
-          <Button variant={type === 'production' ? 'default' : 'outline'} size="sm" onClick={() => setType('production')}>
+          <Button
+            variant={type === 'production' ? 'default' : 'outline'}
+            size="sm"
+            disabled={busy}
+            onClick={() => setType('production')}
+          >
             <FileType className="h-3.5 w-3.5" />
             生产制作单
           </Button>
