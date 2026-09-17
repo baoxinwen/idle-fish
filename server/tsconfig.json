@@ -3,7 +3,9 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "outDir": "dist",
     "rootDir": "src",
     "strict": true,
@@ -14,6 +16,11 @@
     "declaration": false,
     "sourceMap": true
   },
-  "include": ["src"],
-  "exclude": ["dist"]
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "dist",
+    "src/test"
+  ]
 }
