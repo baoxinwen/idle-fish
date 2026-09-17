@@ -9,9 +9,9 @@
  *     移动端底部常驻预估利润条。
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Save, ArrowLeft, Plus } from 'lucide-react';
+import { Save, ArrowLeft, Plus, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,15 +21,16 @@ import { AccessoryRow } from '@/components/quote-form/accessory-row';
 import { PriceActionBar } from '@/components/price-action-bar';
 import { useOrderStore } from '@/store/order-store';
 import { useToast } from '@/components/toaster';
-import { LoadingState } from '@/components/states';
+import { LoadingState, EmptyState } from '@/components/states';
 import { Modal } from '@/components/ui/modal';
 import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
+import { useDirtyTracking } from '@/lib/use-dirty-tracking';
 import { emptyConvertForm, type ConvertConfirmForm } from '@/lib/convert-form';
 import { ordersApi, quotesApi, settingsApi } from '@/lib/api';
 import { formatMoney, cn } from '@/lib/utils';
-import { calcOrderFinance, roundMoney } from '@idlefish/shared';
+import { calcOrderFinance, roundMoney } from '@idle-fish/shared';
 import { CATEGORY_LABEL } from '@/lib/status';
-import type { AccessoryCategory, AccessoryItem, CabinetSize, QuoteRecord } from '@idlefish/shared';
+import type { AccessoryCategory, AccessoryItem, CabinetSize, QuoteRecord } from '@idle-fish/shared';
 
 type Mode = 'create' | 'convert' | 'edit';
 
@@ -71,27 +72,22 @@ export function OrderEditorPage() {
   } = useOrderStore();
 
   const [saving, setSaving] = useState(false);
+  // I-5：加载失败的终止态——此前失败只 toast，页面永久停留「加载中」且无重试
+  const [loadError, setLoadError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
 
-  // 未保存修改跟踪
-  const baselineRef = useRef('');
-  const justLoaded = useRef(false);
-  const [dirty, setDirty] = useState(false);
-  // 跟踪对象：convert 模式用 convertForm，其他用 store form
+  // 未保存修改跟踪（I-2：抽为共用 hook——保存必须 markSaved()，
+  // 悬挂的 justLoaded 会把保存后的第一次编辑吞成基线、令离开守卫失效）
+  // 跟踪对象：convert 模式用 convertForm，其他用 store form。
+  // hook 内 effect 依赖 source 根对象引用，与此前的 [trackSource] 一致：字段级订阅会破坏整树 dirty 比对
   const trackSource = mode === 'convert' ? convertForm : form;
-  useEffect(() => {
-    if (justLoaded.current) {
-      baselineRef.current = JSON.stringify(trackSource);
-      setDirty(false);
-      justLoaded.current = false;
-      return;
-    }
-    setDirty(JSON.stringify(trackSource) !== baselineRef.current);
-  }, [trackSource]); // 依赖刻意绑定 trackSource 根对象引用：字段级订阅会破坏整树 dirty 比对
+  const { dirty, markLoaded, markSaved } = useDirtyTracking(trackSource);
   const { blocker, clearDirty } = useUnsavedChanges(dirty);
 
   useEffect(() => {
     let cancelled = false; // M7：竞态守卫——快速切换路由/参数时丢弃迟到响应
-    justLoaded.current = true;
+    setLoadError(false);
+    markLoaded();
     if (mode === 'convert' && fromQuote) {
       setQuote(null); // 重新加载前清空，避免渲染上一个报价
       // L11：整体重置确认表单——同路由连续转单（?fromQuote=A→B）不残留上一单客户/收货信息
@@ -112,7 +108,9 @@ export function OrderEditorPage() {
           }));
         })
         .catch((e) => {
-          if (!cancelled) toast(`加载报价失败：${e}`);
+          if (cancelled) return;
+          toast(`加载报价失败：${e}`);
+          setLoadError(true);
         });
     } else if (mode === 'edit' && id) {
       markLoading(); // 避免渲染上一个订单数据
@@ -122,7 +120,9 @@ export function OrderEditorPage() {
           if (!cancelled) loadFromRecord(r);
         })
         .catch((e) => {
-          if (!cancelled) toast(`加载订单失败：${e}`);
+          if (cancelled) return;
+          toast(`加载订单失败：${e}`);
+          setLoadError(true);
         });
     } else {
       // 手动新建：markLoading 避免闪现上一个订单的陈旧数据（此前编辑过订单时 initialized=true）
@@ -134,13 +134,15 @@ export function OrderEditorPage() {
           if (!cancelled) reset(s);
         })
         .catch((e) => {
-          if (!cancelled) toast(`加载设置失败：${e}`);
+          if (cancelled) return;
+          toast(`加载设置失败：${e}`);
+          setLoadError(true);
         });
     }
     return () => {
       cancelled = true;
     };
-  }, [mode, fromQuote, id]); // 依赖刻意为三元组：共同决定加载目标
+  }, [mode, fromQuote, id, retryNonce]); // retryNonce：I-5 重试按钮重新触发加载
 
   // 实时财务（转单模式用用户在右侧确认的价格）
   const finance = useMemo(() => {
@@ -174,8 +176,7 @@ export function OrderEditorPage() {
           finance: convertForm.finance,
         });
         toast(`已转单：${res.orderNo}`);
-        justLoaded.current = true;
-        setDirty(false);
+        markSaved();
         clearDirty();
         navigate(`/orders/${res.orderId}`, { replace: true });
       } else if (mode === 'edit' && editingId) {
@@ -190,9 +191,8 @@ export function OrderEditorPage() {
           actualPrice: form.actualPrice,
           remark: form.remark,
         });
-        justLoaded.current = true;
-        baselineRef.current = JSON.stringify(form);
-        setDirty(false);
+        // I-2：保存不改变 form 引用、effect 不会执行——必须直接定基线
+        markSaved();
         clearDirty();
         toast('已保存修改');
       } else {
@@ -209,8 +209,7 @@ export function OrderEditorPage() {
           remark: form.remark,
         });
         toast(`已创建：${res.orderNo}`);
-        justLoaded.current = true;
-        setDirty(false);
+        markSaved();
         clearDirty();
         navigate('/orders', { replace: true });
       }
@@ -219,6 +218,28 @@ export function OrderEditorPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // M-16：fromQuote 切换（A→B）时 effect 生效前的一帧 quote 仍是旧报价 A——
+  // ready 判定必须校验 quote.id 与 fromQuote 一致，否则该首帧可点保存、
+  // 以 B 的来源 + A 的表单数据错误转单（B 转单不可逆）
+  const ready = mode === 'convert' ? quote !== null && quote.id === fromQuote : initialized;
+
+  // I-5：加载失败的终止态——可重试、可返回，不再永久停留「加载中」
+  if (loadError && !ready) {
+    const title = mode === 'convert' ? '报价转订单' : mode === 'edit' ? '编辑订单' : '新建订单';
+    return (
+      <div className="space-y-4">
+        <BackBar onBack={() => navigate('/orders')} title={title} />
+        <EmptyState
+          icon={AlertTriangle}
+          text="加载失败"
+          hint="数据未能加载，请检查网络后重试"
+          actionLabel="重试"
+          onAction={() => setRetryNonce((n) => n + 1)}
+        />
+      </div>
+    );
   }
 
   // 转单模式下，若报价已转单则禁止
@@ -234,8 +255,6 @@ export function OrderEditorPage() {
       </div>
     );
   }
-
-  const ready = mode === 'convert' ? quote !== null : initialized;
 
   if (!ready) return <LoadingState />;
 

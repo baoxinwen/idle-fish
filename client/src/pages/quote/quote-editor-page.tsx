@@ -3,7 +3,7 @@
  * 移动端由底部 PriceActionBar 常驻最终报价与保存按钮。
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Save, ArrowLeft, Download, FilePlus, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -17,10 +17,11 @@ import { LoadingState } from '@/components/states';
 import { ConvertQuoteDialog, useConvertQuote } from '@/components/quote-form/convert-dialog';
 import { useQuoteStore } from '@/store/quote-store';
 import { useUnsavedChanges } from '@/lib/use-unsaved-changes';
+import { useDirtyTracking } from '@/lib/use-dirty-tracking';
 import { useToast } from '@/components/toaster';
 import { quotesApi, settingsApi } from '@/lib/api';
 import { formatMoney } from '@/lib/utils';
-import { calcQuote, type QuoteRecord, type Settings } from '@idlefish/shared';
+import { calcQuote, type QuoteRecord, type Settings } from '@idle-fish/shared';
 
 export function QuoteEditorPage() {
   const { id } = useParams<{ id?: string }>();
@@ -41,20 +42,8 @@ export function QuoteEditorPage() {
   });
 
   // 未保存修改跟踪：baseline 是上次加载/保存的 input 快照，input 变化与之比较
-  const baselineRef = useRef<string>('');
-  const justLoaded = useRef(false);
-  const [dirty, setDirty] = useState(false);
-
-  useEffect(() => {
-    if (justLoaded.current) {
-      // 加载/重置/保存后的首次 input 变化：更新 baseline，不算 dirty
-      baselineRef.current = JSON.stringify(input);
-      setDirty(false);
-      justLoaded.current = false;
-      return;
-    }
-    setDirty(JSON.stringify(input) !== baselineRef.current);
-  }, [input]);
+  //（I-2：抽为共用 hook——保存必须 markSaved()，悬挂的 justLoaded 会吞掉保存后首次编辑）
+  const { dirty, setDirty, markLoaded, markSaved } = useDirtyTracking(input);
 
   const { blocker, clearDirty } = useUnsavedChanges(dirty);
 
@@ -65,11 +54,30 @@ export function QuoteEditorPage() {
     // 注意：此分支不产生 input 变化，不可重设 justLoaded.current——
     // 否则创建后第一次编辑会被误当作「刚加载」而吞掉 dirty 标记。
     if (id && editingId === id && initialized) {
+      // C-3：跳过分支只覆盖「创建后跳转」场景。用户离开编辑页后本地 settings 随组件
+      // 卸载丢失，重进同一报价时命中此分支会停在 settings=null——保存静默失效、
+      // 「恢复默认计价参数」入口消失。此处仅补拉 settings，编辑态仍以 store 为准。
+      if (!settings) {
+        let cancelled = false;
+        settingsApi
+          .get()
+          .then((s) => {
+            if (!cancelled) setSettings(s);
+          })
+          .catch((e) => {
+            if (cancelled) return;
+            toast(`加载失败：${e}`);
+            navigate('/quotes', { replace: true });
+          });
+        return () => {
+          cancelled = true;
+        };
+      }
       return;
     }
     let cancelled = false; // M7：竞态守卫——快速切换路由时丢弃迟到响应
     markLoading();
-    justLoaded.current = true;
+    markLoaded();
     (async () => {
       try {
         const s = await settingsApi.get();
@@ -99,19 +107,28 @@ export function QuoteEditorPage() {
   }
 
   async function handleSave() {
-    if (!settings) return;
+    if (!settings) {
+      // C-3 伴随提示：settings 补拉窗口内点击保存不再静默无动作
+      toast('计价参数加载中，请稍候');
+      return;
+    }
+    // I-6：已转单报价服务端拒绝更新（WHERE status != 'converted'），
+    // 前端同步禁保存并明示，不让用户在必败路径上输入
+    if (editingStatus === 'converted') {
+      toast('该报价已转为订单，不可编辑保存');
+      return;
+    }
     setSaving(true);
     try {
       if (editingId) {
         await quotesApi.update(editingId, input);
-        justLoaded.current = true;
-        baselineRef.current = JSON.stringify(input);
-        setDirty(false);
+        // I-2：保存不改变 input 引用、effect 不会执行——必须直接定基线
+        markSaved();
         clearDirty();
         toast('已保存修改');
       } else {
         const record = await quotesApi.create(input);
-        justLoaded.current = true;
+        markLoaded();
         loadFromRecord(record.input, record.id, record.status);
         clearDirty();
         toast(`已保存：${record.quoteNo}`);
@@ -135,13 +152,11 @@ export function QuoteEditorPage() {
       } else {
         const record = await quotesApi.create(input);
         savedId = record.id;
-        justLoaded.current = true;
+        markLoaded();
         loadFromRecord(record.input, record.id, record.status);
         navigate(`/quotes/${record.id}`, { replace: true });
       }
-      justLoaded.current = true;
-      baselineRef.current = JSON.stringify(input);
-      setDirty(false);
+      markSaved();
       clearDirty();
     } catch (e) {
       toast(`保存失败：${e}`);
@@ -166,6 +181,9 @@ export function QuoteEditorPage() {
             <h1 className="text-xl font-bold">{editingId ? '编辑报价' : '新建报价'}</h1>
             {editingId && !statusLabel && (
               <p className="hidden text-xs text-muted-foreground sm:block">修改后保存将更新此报价</p>
+            )}
+            {statusLabel && (
+              <p className="text-xs text-destructive">该报价已转为订单，内容只读，不可保存</p>
             )}
           </div>
         </div>
@@ -204,7 +222,13 @@ export function QuoteEditorPage() {
             <FilePlus className="h-4 w-4" />
             {statusLabel ? '已转单' : '转订单'}
           </Button>
-          <Button variant="accent" className="hidden lg:inline-flex" onClick={handleSave} disabled={saving}>
+          <Button
+            variant="accent"
+            className="hidden lg:inline-flex"
+            onClick={handleSave}
+            disabled={saving || statusLabel}
+            title={statusLabel ? '该报价已转为订单，不可保存' : undefined}
+          >
             <Save className="h-4 w-4" />
             {saving ? '保存中…' : '保存'}
           </Button>
@@ -287,13 +311,21 @@ export function QuoteEditorPage() {
       />
 
       {/* 移动端底部常驻价格条 */}
-      <QuoteMobilePriceBar onSave={handleSave} saving={saving} />
+      <QuoteMobilePriceBar onSave={handleSave} saving={saving} converted={statusLabel} />
     </div>
   );
 }
 
 /** 报价页移动端价格条内容：实时最终报价 + 总成本提示 */
-function QuoteMobilePriceBar({ onSave, saving }: { onSave: () => void; saving: boolean }) {
+function QuoteMobilePriceBar({
+  onSave,
+  saving,
+  converted,
+}: {
+  onSave: () => void;
+  saving: boolean;
+  converted?: boolean;
+}) {
   const input = useQuoteStore((s) => s.input);
   const result = useMemo(() => calcQuote(input), [input]);
   return (
@@ -304,6 +336,7 @@ function QuoteMobilePriceBar({ onSave, saving }: { onSave: () => void; saving: b
       danger={result.expectedProfit < 0}
       onSave={onSave}
       saving={saving}
+      disabled={converted}
     />
   );
 }

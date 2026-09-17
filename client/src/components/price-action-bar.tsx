@@ -20,9 +20,11 @@ interface PriceActionBarProps {
   danger?: boolean;
   onSave: () => void;
   saving?: boolean;
+  /** 禁用保存（I-6：如已转单报价的只读态） */
+  disabled?: boolean;
 }
 
-export function PriceActionBar({ value, label = '最终报价', hint, danger, onSave, saving }: PriceActionBarProps) {
+export function PriceActionBar({ value, label = '最终报价', hint, danger, onSave, saving, disabled }: PriceActionBarProps) {
   return (
     <>
       {/* 固定条 */}
@@ -38,7 +40,7 @@ export function PriceActionBar({ value, label = '最终报价', hint, danger, on
           />
           {hint && <div className="label-mono truncate text-[10px] text-muted-foreground/70">{hint}</div>}
         </div>
-        <Button variant="accent" className="ml-auto shrink-0" onClick={onSave} disabled={saving}>
+        <Button variant="accent" className="ml-auto shrink-0" onClick={onSave} disabled={saving || disabled}>
           <Save className="h-4 w-4" />
           {saving ? '保存中…' : '保存'}
         </Button>
