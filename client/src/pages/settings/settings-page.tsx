@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { Save, RotateCcw } from 'lucide-react';
+import { Save, RotateCcw, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ import { SegmentedControl } from '@/components/ui/segmented-control';
 import { ParamRow } from '@/components/param-row';
 import { useSettingsStore } from '@/store/settings-store';
 import { useToast } from '@/components/toaster';
-import { LoadingState } from '@/components/states';
+import { LoadingState, EmptyState } from '@/components/states';
 import { confirmDialog } from '@/components/confirm-dialog';
 import { AccessoriesConfig } from './accessories-config';
 import { BackupSection } from './backup-section';
@@ -36,10 +36,17 @@ export function SettingsPage() {
   } = useSettingsStore();
   const toast = useToast((s) => s.show);
   const [saving, setSaving] = useState(false);
+  // I-5：加载失败的终止态——此前失败只 toast，页面永久停留「加载中」且无重试
+  const [loadError, setLoadError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
-    load().catch((e) => toast(`加载失败：${e}`));
-  }, []); // 依赖刻意为空：仅首次挂载加载一次
+    setLoadError(false);
+    load().catch((e) => {
+      setLoadError(true);
+      toast(`加载失败：${e}`);
+    });
+  }, [retryNonce]); // 仅首次挂载与手动重试时加载
 
   async function handleSave() {
     setSaving(true);
@@ -62,6 +69,19 @@ export function SettingsPage() {
     } catch (e) {
       toast(`加载失败：${e}`);
     }
+  }
+
+  if (loadError && (!loaded || !settings)) {
+    return (
+      <EmptyState
+        icon={AlertTriangle}
+        text="加载失败"
+        hint="设置数据未能加载，请检查网络后重试"
+        actionLabel="重试"
+        onAction={() => setRetryNonce((n) => n + 1)}
+        className="mt-10"
+      />
+    );
   }
 
   if (!loaded || !settings) return <LoadingState />;

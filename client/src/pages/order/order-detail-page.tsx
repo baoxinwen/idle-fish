@@ -17,6 +17,7 @@ import {
   Copy,
   ChevronDown,
   ChevronRight,
+  AlertTriangle,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,7 @@ import { confirmDialog } from '@/components/confirm-dialog';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_BADGE, CATEGORY_LABEL } from '@/lib/status';
 import { formatMoney, formatShortDateTime, cn, profitColor } from '@/lib/utils';
 import { copyText } from '@/lib/clipboard';
-import type { OrderRecord, OrderStatus } from '@idlefish/shared';
+import type { OrderRecord, OrderStatus } from '@idle-fish/shared';
 
 /** 各状态可执行的动作 */
 const ACTIONS: Partial<
@@ -55,6 +56,8 @@ export function OrderDetailPage() {
   const toast = useToast((s) => s.show);
   const [record, setRecord] = useState<OrderRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  // I-5：加载失败标记——此前失败后 record 为 null 会误显「订单不存在」，且无重试
+  const [loadError, setLoadError] = useState(false);
   const [shipOpen, setShipOpen] = useState(false);
   const [shipForm, setShipForm] = useState({ courier: '', trackingNo: '', actualFreight: 0, checkRemark: '' });
   // 零数量材料默认折叠
@@ -71,6 +74,7 @@ export function OrderDetailPage() {
     if (!id) return;
     const seq = ++reqSeq.current;
     setLoading(true);
+    setLoadError(false);
     try {
       const r = await ordersApi.get(id);
       if (seq !== reqSeq.current) return;
@@ -78,6 +82,7 @@ export function OrderDetailPage() {
       setShowZeroMaterials(false);
     } catch (e) {
       if (seq !== reqSeq.current) return;
+      setLoadError(true);
       toast(`加载失败：${e}`);
     } finally {
       if (seq === reqSeq.current) setLoading(false);
@@ -124,12 +129,27 @@ export function OrderDetailPage() {
   }
 
   if (loading) return <LoadingState />;
+  // I-5：请求失败（订单实际存在）显示可重试的错误态，而非误导性的「订单不存在」
+  if (loadError && !record) {
+    return (
+      <EmptyState
+        icon={AlertTriangle}
+        text="加载失败"
+        hint="订单数据未能加载，请检查网络后重试"
+        actionLabel="重试"
+        onAction={refresh}
+        className="mt-10"
+      />
+    );
+  }
   if (!id || !record) return <EmptyState text="订单不存在" />;
 
   const actions = ACTIONS[record.status] ?? [];
   const canEdit = record.status === 'pending' || record.status === 'producing' || record.status === 'ready';
   const currentStep = FLOW.indexOf(record.status);
-  const cancelAction = record.status !== 'done' && record.status !== 'cancelled';
+  // M-15：与服务端状态机对齐（shipped 只允许 done）——此前 shipped 仍显示「取消订单」，
+  // 点击必被服务端 400 拒绝
+  const cancelAction = canEdit;
 
   const materials = record.materials;
   const activeMaterials = materials.filter((m) => m.quantity > 0);

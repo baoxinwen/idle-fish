@@ -10,7 +10,7 @@ import {
   type PricingParams,
   type ProfileColor,
   type Settings,
-} from '@idlefish/shared';
+} from '@idle-fish/shared';
 import { settingsApi } from '@/lib/api';
 
 interface SettingsStoreState {
@@ -125,6 +125,8 @@ export const useSettingsStore = create<SettingsStoreState>((set, get) => ({
     const { settings } = get();
     if (!settings) return;
     await settingsApi.update(settings);
-    set({ dirty: false });
+    // I-3：仅当往返期间没有新编辑（settings 引用未变——所有 setter 都替换对象）才清脏。
+    // 在途编辑不随保存成功被静默吞掉：既不在 payload 里，就保留「未保存」保护。
+    if (get().settings === settings) set({ dirty: false });
   },
 }));
