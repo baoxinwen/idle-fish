@@ -15,7 +15,7 @@ import { getDb } from '../db/index.js';
 import { dataDir } from '../db/index.js';
 import { nowIso } from './no.js';
 
-export const COOKIE_NAME = 'idlefish_session';
+export const COOKIE_NAME = 'idle-fish-session';
 /** 会话有效期 7 天 */
 export const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 /** 滑动续期阈值：距过期不足 1 天时续期 */
@@ -70,10 +70,12 @@ export function getSetupToken(): string | null {
 }
 
 /** 校验 setup 请求带的 token（timingSafeEqual 恒定时间比较，防时序侧信道） */
-export function isSetupTokenValid(provided: string | undefined): boolean {
+export function isSetupTokenValid(provided: unknown): boolean {
   const expected = getSetupToken();
   if (!expected) return false; // 未初始化 token（启动未调 ensureSetupToken）则拒绝
-  if (!provided) return false;
+  // M-5：body 可注入任意 JSON 类型（数字/对象/数组），非字符串一律拒绝，
+  // 避免 Buffer.from 对非字符串抛 TypeError → 500；语义上等同校验失败（403）。
+  if (typeof provided !== 'string' || provided.length === 0) return false;
   // timingSafeEqual 要求等长 Buffer；长度不等时仍走完比较避免长度时序侧信道
   const a = Buffer.from(provided);
   const b = Buffer.from(expected);
@@ -99,17 +101,17 @@ interface SessionRow {
   created_at: string;
 }
 
-/** cookie 选项：httpOnly + SameSite=Strict + 生产 Secure。isClear 用于清除 cookie */
-export function cookieOptions(isClear = false) {
+/** cookie 选项：httpOnly + SameSite=Strict + Secure 按实际连接自适应。
+ * Secure 跟随 req.secure（经反代时由 trust proxy + X-Forwarded-Proto 判定）：
+ * HTTPS 访问带 Secure，局域网 HTTP 直访不带——浏览器本就丢弃 HTTP 下的 Secure cookie，
+ * 强制开启会让 LAN 登录「成功后立刻掉线」。IDLE_FISH_COOKIE_SECURE 仍可显式覆盖：
+ * '1' 强制开启（如反代未回传 X-Forwarded-Proto 的 HTTPS 部署），'0' 强制关闭。 */
+export function cookieOptions(req: Request, isClear = false) {
+  const override = process.env.IDLE_FISH_COOKIE_SECURE;
   return {
     httpOnly: true,
     sameSite: 'strict' as const,
-    // Secure 开关：默认生产开启（cookie 仅经 HTTPS 发送）。可用 IDLEFISH_COOKIE_SECURE 显式覆盖：
-    // '0' 关闭（仅供受信任内网 HTTP 直访使用，公网禁用），'1' 强制开启。
-    // 未设置环境变量时按 NODE_ENV 判定。
-    secure: process.env.IDLEFISH_COOKIE_SECURE
-      ? process.env.IDLEFISH_COOKIE_SECURE === '1'
-      : process.env.NODE_ENV === 'production',
+    secure: override ? override === '1' : req.secure,
     path: '/',
     maxAge: isClear ? 0 : SESSION_MAX_AGE_MS,
   };
@@ -194,7 +196,7 @@ export function touchSession(sid: string, res?: Response): boolean {
   const newExpiry = expiryIso();
   db.prepare('UPDATE sessions SET expires_at = ? WHERE id = ?').run(newExpiry, sid);
   // 重发 cookie 刷新客户端 maxAge，与服务端 expires_at 同步
-  if (res) res.cookie(COOKIE_NAME, sid, cookieOptions());
+  if (res) res.cookie(COOKIE_NAME, sid, cookieOptions(res.req));
   return true;
 }
 

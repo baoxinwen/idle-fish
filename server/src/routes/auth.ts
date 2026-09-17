@@ -7,7 +7,7 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { z } from 'zod';
-import { loginSchema, setupSchema } from '@idlefish/shared';
+import { loginSchema, setupSchema } from '@idle-fish/shared';
 import { getDb } from '../db/index.js';
 import {
   COOKIE_NAME,
@@ -23,7 +23,7 @@ import {
 } from '../lib/auth.js';
 import { nowIso } from '../lib/no.js';
 import { log } from '../lib/logger.js';
-import { asyncHandler } from '../lib/http-error.js';
+import { HttpError, sendTxError, asyncHandler } from '../lib/http-error.js';
 
 export const authRouter = Router();
 /** 受鉴权保护的 auth 路由（需 session + 限流）：改密等。挂在 requireAuth gate 之后。 */
@@ -50,7 +50,7 @@ authRouter.get('/status', (req, res) => {
 });
 
 // 首次设置：创建唯一管理员账户，之后不再开放
-// 公网部署下需带 IDLEFISH_SETUP_TOKEN（请求头 x-setup-token），防止首启窗口被抢注
+// 公网部署下需带 IDLE_FISH_SETUP_TOKEN（请求头 x-setup-token），防止首启窗口被抢注
 authRouter.post('/setup', authLimiter, asyncHandler(async (req, res) => {
   if (userExists()) {
     return res.status(409).json({ error: '管理员账户已存在' });
@@ -66,12 +66,22 @@ authRouter.post('/setup', authLimiter, asyncHandler(async (req, res) => {
   }
   const { username, password } = parsed.data;
   const hash = await hashPassword(password);
-  getDb()
-    .prepare('INSERT INTO users (id, username, password_hash, created_at) VALUES (1, ?, ?, ?)')
-    .run(username, hash, nowIso());
+  // M-4：check-then-act 竞态修复——hash（await 点）完成后进入【同步】事务内复查+插入。
+  // better-sqlite3 事务执行期间无事件循环让位点，并发第二个请求必在事务内命中复查，
+  // 以 409 语义化拒绝，而非主键冲突炸成 500。
+  try {
+    getDb().transaction(() => {
+      if (userExists()) throw new HttpError(409, '管理员账户已存在');
+      getDb()
+        .prepare('INSERT INTO users (id, username, password_hash, created_at) VALUES (1, ?, ?, ?)')
+        .run(username, hash, nowIso());
+    })();
+  } catch (e) {
+    return sendTxError(res, e, '初始化失败');
+  }
   // 创建会话并设 cookie，设置完直接登录态
   const { sid } = createSession(1);
-  res.cookie(COOKIE_NAME, sid, cookieOptions());
+  res.cookie(COOKIE_NAME, sid, cookieOptions(req));
   log.info('auth', '首次设置完成', { user: username, ip: req.ip });
   res.json({ authenticated: true });
 }));
@@ -93,7 +103,7 @@ authRouter.post('/login', authLimiter, asyncHandler(async (req, res) => {
     return res.status(401).json({ error: '用户名或密码错误' });
   }
   const { sid } = createSession(user.id);
-  res.cookie(COOKIE_NAME, sid, cookieOptions());
+  res.cookie(COOKIE_NAME, sid, cookieOptions(req));
   log.info('auth', '登录成功', { user: username, ip: req.ip });
   res.json({ authenticated: true });
 }));
@@ -107,7 +117,7 @@ authRouter.post('/logout', (req, res) => {
     username = u?.username;
     destroySession(sid);
   }
-  res.clearCookie(COOKIE_NAME, cookieOptions(true));
+  res.clearCookie(COOKIE_NAME, cookieOptions(req, true));
   log.info('auth', '登出', { user: username, ip: req.ip });
   res.json({ ok: true });
 });
@@ -149,7 +159,7 @@ authProtectedRouter.post('/password', authLimiter, asyncHandler(async (req, res)
   // 导致「销毁全部」只落在注释里、其他设备会话在改密后仍存活，此处纠正为文档化语义。
   getDb().prepare('DELETE FROM sessions').run();
   const { sid } = createSession(user.id);
-  res.cookie(COOKIE_NAME, sid, cookieOptions());
+  res.cookie(COOKIE_NAME, sid, cookieOptions(req));
   log.info('auth', '改密成功，已轮换会话', { user: user.username, ip: req.ip });
   res.json({ ok: true });
 }));
