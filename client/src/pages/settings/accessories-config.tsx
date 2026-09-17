@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useSettingsStore } from '@/store/settings-store';
 import { CATEGORY_LABEL } from '@/lib/status';
-import type { AccessoryCategory } from '@idlefish/shared';
+import type { AccessoryCategory } from '@idle-fish/shared';
 // F-03：输入收敛统一走 lib/input-sanitize（此前与 accessory-row 各持一份拷贝）
 import { toCount, toPrice } from '@/lib/input-sanitize';
 

@@ -2,7 +2,7 @@
  * 状态标签映射 — 中文文案 + Badge 颜色。
  */
 
-import type { AccessoryCategory, OrderStatus, ProfileColor, QuoteStatus } from '@idlefish/shared';
+import type { AccessoryCategory, OrderStatus, ProfileColor, QuoteStatus } from '@idle-fish/shared';
 import type { BadgeProps } from '@/components/ui/badge';
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {

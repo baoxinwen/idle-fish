@@ -12,7 +12,7 @@ import {
   type QuoteStatus,
   type Settings,
   DEFAULT_SETTINGS,
-} from '@idlefish/shared';
+} from '@idle-fish/shared';
 
 interface QuoteStoreState {
   /** 当前编辑的报价输入 */

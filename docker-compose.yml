@@ -1,26 +1,26 @@
 services:
-  idlefish:
-    image: ghcr.io/baoxinwen/idlefish:latest
-    container_name: idlefish
+  idle-fish:
+    image: ghcr.io/baoxinwen/idle-fish:latest
+    container_name: idle-fish
     restart: unless-stopped
     ports:
       - "3000:3000"
     volumes:
-      - idlefish-data:/data
+      - idle-fish-data:/data
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - IDLEFISH_HOST=0.0.0.0
+      - IDLE_FISH_HOST=0.0.0.0
       # 与反代跳数匹配（单层反代/Cloudflare Tunnel = 1；未用反代直暴公网 = 0，否则限流可被伪造 XFF 绕过）
-      - IDLEFISH_TRUST_PROXY=1
-      - IDLEFISH_DATA_DIR=/data
+      - IDLE_FISH_TRUST_PROXY=1
+      - IDLE_FISH_DATA_DIR=/data
       - TZ=Asia/Shanghai
       # 日志级别（可选）：默认 info；排障时可临时设 debug/verbose，无需改码重建
       # - LOG_LEVEL=debug
-      # Cookie Secure 开关：默认生产开启（cookie 仅经 HTTPS 发送）。
-      # 如需在受信任内网用 http://<LAN-IP>:3000 直接访问并保持登录，取消注释下一行；
-      # 公网部署严禁关闭，否则会话 cookie 可被明文窃取。
-      # - IDLEFISH_COOKIE_SECURE=0
+      # Cookie Secure 开关（可选）：默认按实际连接自适应——HTTPS 访问带 Secure，
+      # 局域网 HTTP 直访不带，两种场景均可正常登录。
+      # 仅当反代终结 HTTPS 但未回传 X-Forwarded-Proto 时需强制开启：
+      # - IDLE_FISH_COOKIE_SECURE=1
 
 volumes:
-  idlefish-data:
+  idle-fish-data:

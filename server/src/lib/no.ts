@@ -3,7 +3,7 @@
  */
 
 import type { Database as DBType } from 'better-sqlite3';
-import { genBusinessNo } from '@idlefish/shared';
+import { genBusinessNo } from '@idle-fish/shared';
 
 /**
  * 本地时区日期串 YYYY-MM-DD。

@@ -1,4 +1,4 @@
-# IdleFish — 铝型材机柜报价工具
+# idle-fish — 铝型材机柜报价工具
 
 把「报价 → 订单 → 生产 → 发货」全链路数字化的单用户 Web 工具。
 
@@ -42,12 +42,15 @@ docker compose up -d
 # 访问 http://localhost:3000
 ```
 
-数据持久化在 `idlefish-data` 卷（SQLite 文件）。停止：`docker compose down`，停止并删数据：`docker compose down -v`。
+数据持久化在 `idle-fish-data` 卷（SQLite 文件）。停止：`docker compose down`，停止并删数据：`docker compose down -v`。
 
 如需自行构建镜像：
 
 ```bash
-docker compose build   # 用本地 Dockerfile 构建
+git clone https://github.com/baoxinwen/idle-fish.git
+cd idle-fish
+docker build -t idle-fish:local .
+# 将 docker-compose.yml 中 image: 一行改为 idle-fish:local，然后
 docker compose up -d
 ```
 
@@ -56,7 +59,7 @@ docker compose up -d
 容器首次启动会自动生成 setup token 并打到日志，用于创建管理员账户：
 
 ```bash
-docker logs idlefish   # 抄取 setup token
+docker logs idle-fish   # 抄取 setup token
 ```
 
 打开 `http://<域名>/setup`，填入 token + 用户名 + 密码创建唯一管理员。之后访问 `/login` 登录。
@@ -64,13 +67,13 @@ docker logs idlefish   # 抄取 setup token
 ### 部署要点（公网）
 
 - 公网访问经反向代理或隧道（如 nginx/Caddy、Cloudflare Tunnel）终结 HTTPS，应用不自行处理证书
-- 代理需透传真实客户端 IP 的 `X-Forwarded-For`；`IDLEFISH_TRUST_PROXY` 与代理跳数匹配（单层=1，compose 已设），登录限流才能按真实 IP 生效
-- 登录依赖 Secure cookie：生产环境只能经 HTTPS（或本机 localhost）访问。局域网 `http://<IP>:3000` 直访无法保持登录——确有需要时在 compose 中设 `IDLEFISH_COOKIE_SECURE=0`（仅限受信任内网，公网严禁）
+- 代理需透传真实客户端 IP 的 `X-Forwarded-For`；`IDLE_FISH_TRUST_PROXY` 与代理跳数匹配（单层=1，compose 已设），登录限流才能按真实 IP 生效
+- 会话 cookie 的 Secure 标志按实际连接自适应：HTTPS 访问自动带 Secure，局域网 `http://<IP>:3000` 直访也能正常登录。反代/隧道需回传 `X-Forwarded-Proto: https`（常见代理默认带）；若代理不回传，可设 `IDLE_FISH_COOKIE_SECURE=1` 强制开启
 
 ## 目录结构
 
 ```
-IdleFish/
+idle-fish/
 ├── docs/              # 需求规格 / 技术方案 / 审查修复说明
 ├── packages/
 │   └── shared/      # 前后端共享：类型、zod、计价纯函数

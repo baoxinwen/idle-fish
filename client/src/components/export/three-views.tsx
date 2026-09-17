@@ -4,8 +4,8 @@
  * 报价图与生产单共用。
  */
 
-import type { CabinetSize } from '@idlefish/shared';
-import { toInnerSize } from '@idlefish/shared';
+import type { CabinetSize } from '@idle-fish/shared';
+import { toInnerSize } from '@idle-fish/shared';
 import { C } from './sheet-theme';
 
 interface ThreeViewsProps {

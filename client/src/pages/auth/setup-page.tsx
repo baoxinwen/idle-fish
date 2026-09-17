@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { PageLoading } from '@/components/page-loading';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { useAuthStore } from '@/store/auth-store';
-import { setupSchema } from '@idlefish/shared';
+import { setupSchema } from '@idle-fish/shared';
 
 export function SetupPage() {
   const { needsSetup, loaded, ensureLoaded, setup } = useAuthStore();

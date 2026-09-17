@@ -6,10 +6,10 @@
 import { forwardRef } from 'react';
 import { ThreeViews } from './three-views';
 import { C, MONO, SANS, PAGE_WIDTH } from './sheet-theme';
-import type { QuoteRecord } from '@idlefish/shared';
+import type { QuoteRecord } from '@idle-fish/shared';
 import { formatMoney, localDate } from '@/lib/utils';
 import { COLOR_LABEL, CATEGORY_LABEL } from '@/lib/status';
-import { SIZE_GAP, toInnerSize } from '@idlefish/shared';
+import { SIZE_GAP, toInnerSize } from '@idle-fish/shared';
 
 interface ProductionSheetProps {
   quote: QuoteRecord;

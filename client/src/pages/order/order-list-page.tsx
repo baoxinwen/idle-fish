@@ -18,7 +18,7 @@ import { confirmDialog } from '@/components/confirm-dialog';
 import { LoadingState, EmptyState } from '@/components/states';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_BADGE } from '@/lib/status';
 import { formatMoney, formatShortDateTime, profitColor, cn } from '@/lib/utils';
-import type { OrderRecord, OrderStatus } from '@idlefish/shared';
+import type { OrderRecord, OrderStatus } from '@idle-fish/shared';
 
 const FILTERS: { key: 'all' | OrderStatus; label: string }[] = [
   { key: 'all', label: '全部' },

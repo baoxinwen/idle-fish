@@ -11,7 +11,7 @@ import {
   type QuoteStatus,
   type StatsData,
   type StatsRange,
-} from '@idlefish/shared';
+} from '@idle-fish/shared';
 import { getDb } from '../db/index.js';
 
 export const statsRouter = Router();

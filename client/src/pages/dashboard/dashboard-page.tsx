@@ -13,7 +13,7 @@ import { StatCard } from '@/components/ui/stat-card';
 import { statsApi } from '@/lib/api';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_BADGE, QUOTE_STATUS_LABEL } from '@/lib/status';
 import { formatMoney, formatCompactMoney, cn } from '@/lib/utils';
-import type { StatsData, StatsRange } from '@idlefish/shared';
+import type { StatsData, StatsRange } from '@idle-fish/shared';
 import {
   PieChart,
   Pie,

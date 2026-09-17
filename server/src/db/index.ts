@@ -5,17 +5,17 @@
 import Database from 'better-sqlite3';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, renameSync } from 'node:fs';
 import type { Database as DBType } from 'better-sqlite3';
-import { DEFAULT_SETTINGS } from '@idlefish/shared';
+import { DEFAULT_SETTINGS } from '@idle-fish/shared';
 import { SCHEMA_SQL } from './schema-sql.js';
 
 /** 定位数据目录。
- *  - IDLEFISH_DATA_DIR 直接作为数据目录（Docker 等部署用，指向 /data）
+ *  - IDLE_FISH_DATA_DIR 直接作为数据目录（Docker 等部署用，指向 /data）
  *  - 否则定位项目根（含 pnpm-workspace.yaml），用其下的 data/ 子目录
  */
 function findDataDir(): string {
-  const envDir = process.env.IDLEFISH_DATA_DIR;
+  const envDir = process.env.IDLE_FISH_DATA_DIR;
   if (envDir) return envDir;
   let dir = dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 6; i++) {
@@ -29,7 +29,17 @@ function findDataDir(): string {
 
 /** 数据文件目录 */
 export const dataDir = findDataDir();
-const dbPath = join(dataDir, 'idlefish.db');
+const dbPath = join(dataDir, 'idle-fish.db');
+
+/** 项目更名前的库文件名；旧部署升级时自动迁移，避免被当成空库重建 */
+function migrateLegacyDb(): void {
+  const legacyPath = join(dataDir, 'idlefish.db');
+  if (!existsSync(legacyPath)) return;
+  for (const suffix of ['', '-wal', '-shm']) {
+    const from = legacyPath + suffix;
+    if (existsSync(from)) renameSync(from, dbPath + suffix);
+  }
+}
 
 let db: DBType | null = null;
 
@@ -37,6 +47,7 @@ let db: DBType | null = null;
 export function getDb(): DBType {
   if (db) return db;
   mkdirSync(dataDir, { recursive: true });
+  migrateLegacyDb();
   db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');

@@ -20,7 +20,7 @@ import { ExportDialog } from '@/components/export/export-dialog';
 import { ConvertQuoteDialog, useConvertQuote } from '@/components/quote-form/convert-dialog';
 import { QUOTE_STATUS_LABEL, QUOTE_STATUS_BADGE, COLOR_LABEL } from '@/lib/status';
 import { cn, formatMoney, formatShortDateTime } from '@/lib/utils';
-import type { QuoteRecord, QuoteStatus } from '@idlefish/shared';
+import type { QuoteRecord, QuoteStatus } from '@idle-fish/shared';
 
 const FILTERS: { key: 'all' | QuoteStatus; label: string }[] = [
   { key: 'all', label: '全部' },

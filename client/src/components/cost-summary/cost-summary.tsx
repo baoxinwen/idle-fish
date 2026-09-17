@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useQuoteStore } from '@/store/quote-store';
 import { useToast } from '@/components/toaster';
-import { calcQuote } from '@idlefish/shared';
+import { calcQuote } from '@idle-fish/shared';
 import { CATEGORY_LABEL } from '@/lib/status';
 import { buildCostText, buildMaterialsText, copyText } from '@/lib/clipboard';
 import { formatMoney, profitColor, cn } from '@/lib/utils';

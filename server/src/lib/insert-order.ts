@@ -3,7 +3,7 @@
  */
 
 import type { Database as DBType } from 'better-sqlite3';
-import type { CabinetSize, AccessoryItem, CustomerInfo, ShippingAddress, OrderFinance } from '@idlefish/shared';
+import type { CabinetSize, AccessoryItem, CustomerInfo, ShippingAddress, OrderFinance } from '@idle-fish/shared';
 
 export interface InsertOrderParams {
   id: string;

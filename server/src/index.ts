@@ -22,13 +22,13 @@ import { backupRouter } from './routes/backup.js';
 
 const PORT = Number(process.env.PORT ?? 3000);
 // 绑定地址：默认 0.0.0.0（公网部署经反代对外；Docker 内 docker-proxy 连入）。
-// 可用 IDLEFISH_HOST 覆盖。
-const BIND_HOST = process.env.IDLEFISH_HOST ?? '0.0.0.0';
+// 可用 IDLE_FISH_HOST 覆盖。
+const BIND_HOST = process.env.IDLE_FISH_HOST ?? '0.0.0.0';
 
 const app = express();
 // 经 Cloudflare Tunnel / 反向代理后让 express-rate-limit 见真实客户端 IP
-//（隧道/反代 1 跳 → 1，dev 0 跳 → 0，可用 IDLEFISH_TRUST_PROXY 覆盖）
-app.set('trust proxy', Number(process.env.IDLEFISH_TRUST_PROXY ?? (process.env.NODE_ENV === 'production' ? 1 : 0)));
+//（隧道/反代 1 跳 → 1，dev 0 跳 → 0，可用 IDLE_FISH_TRUST_PROXY 覆盖）
+app.set('trust proxy', Number(process.env.IDLE_FISH_TRUST_PROXY ?? (process.env.NODE_ENV === 'production' ? 1 : 0)));
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
@@ -37,7 +37,7 @@ app.use(requestLog);
 
 // 健康检查（公开，gate 之前）
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'idlefish-server', time: new Date().toISOString() });
+  res.json({ ok: true, service: 'idle-fish-server', time: new Date().toISOString() });
 });
 
 // 鉴权路由（公开，gate 之前）
@@ -95,5 +95,5 @@ process.on('unhandledRejection', (reason) => {
 });
 
 app.listen(PORT, BIND_HOST, () => {
-  log.info('server', `IdleFish server running at http://${BIND_HOST}:${PORT}`);
+  log.info('server', `idle-fish server running at http://${BIND_HOST}:${PORT}`);
 });

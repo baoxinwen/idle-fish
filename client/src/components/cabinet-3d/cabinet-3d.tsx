@@ -10,8 +10,8 @@ import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Edges } from '@react-three/drei';
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
-import type { CabinetSize, ProfileColor } from '@idlefish/shared';
-import { SIZE_GAP } from '@idlefish/shared';
+import type { CabinetSize, ProfileColor } from '@idle-fish/shared';
+import { SIZE_GAP } from '@idle-fish/shared';
 
 interface Cabinet3DProps {
   size: CabinetSize;

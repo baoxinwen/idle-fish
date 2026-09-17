@@ -14,7 +14,7 @@ import { NumberField } from '@/components/number-field';
 import { useToast } from '@/components/toaster';
 import { emptyConvertForm, type ConvertConfirmForm } from '@/lib/convert-form';
 import { quotesApi } from '@/lib/api';
-import { calcQuote, type QuoteInput } from '@idlefish/shared';
+import { calcQuote, type QuoteInput } from '@idle-fish/shared';
 
 /** 参与转单的最小目标：已保存的报价 id + 当前输入快照 */
 export interface ConvertTarget {

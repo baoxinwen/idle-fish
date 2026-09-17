@@ -18,12 +18,12 @@ import { AccessoryRow } from './accessory-row';
 import { useQuoteStore } from '@/store/quote-store';
 import { cn } from '@/lib/utils';
 import { COLOR_LABEL, CATEGORY_LABEL } from '@/lib/status';
-import { calcTraySuggestedPrice, type Settings } from '@idlefish/shared';
-import type { AccessoryCategory } from '@idlefish/shared';
+import { calcTraySuggestedPrice, type Settings } from '@idle-fish/shared';
+import type { AccessoryCategory } from '@idle-fish/shared';
 
 const CATEGORY_ORDER: AccessoryCategory[] = ['connector', 'fastener', 'blindplate', 'tray', 'custom'];
 
-const PRICE_HINT_KEY = 'idlefish:price-hint-dismissed';
+const PRICE_HINT_KEY = 'idle-fish:price-hint-dismissed';
 
 export function QuoteForm({ settings }: { settings: Settings | null }) {
   const navigate = useNavigate();

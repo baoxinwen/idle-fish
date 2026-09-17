@@ -4,7 +4,7 @@
  * 重依赖（html-to-image/jspdf/xlsx）动态 import，仅在用户点导出时加载。
  */
 
-import type { QuoteRecord } from '@idlefish/shared';
+import type { QuoteRecord } from '@idle-fish/shared';
 import { formatMoney, formatDateTime } from './utils';
 import { COLOR_LABEL, CATEGORY_LABEL } from './status';
 

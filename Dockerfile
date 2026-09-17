@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# IdleFish — 铝型材机柜报价工具
+# idle-fish — 铝型材机柜报价工具
 # 多阶段构建：builder 编译 + pnpm deploy 打包 server 生产依赖，runner 直接运行
 
 # ---------- builder ----------
@@ -23,14 +23,14 @@ RUN pnpm install --frozen-lockfile
 COPY packages/shared ./packages/shared
 COPY client ./client
 COPY server ./server
-RUN pnpm --filter @idlefish/shared build \
-    && pnpm --filter @idlefish/client build \
-    && pnpm --filter @idlefish/server build
+RUN pnpm --filter @idle-fish/shared build \
+    && pnpm --filter @idle-fish/client build \
+    && pnpm --filter @idle-fish/server build
 
-# pnpm deploy 把 server 及其生产依赖（含 @idlefish/shared）打包到 /app/deploy
+# pnpm deploy 把 server 及其生产依赖（含 @idle-fish/shared）打包到 /app/deploy
 # 产物：/app/deploy/node_modules、/app/deploy/dist、/app/deploy/package.json
 # --legacy：pnpm v10 默认要求 inject-workspace-packages=true 才能 deploy，加此标志走传统 deploy
-RUN pnpm --filter @idlefish/server deploy /app/deploy --prod --legacy
+RUN pnpm --filter @idle-fish/server deploy /app/deploy --prod --legacy
 
 # ---------- runner ----------
 FROM node:20-bookworm-slim AS runner
@@ -52,7 +52,7 @@ COPY --from=builder /app/client/dist ./client/dist
 
 ENV NODE_ENV=production
 ENV PORT=3000
-ENV IDLEFISH_DATA_DIR=/data
+ENV IDLE_FISH_DATA_DIR=/data
 
 # 不在此处 USER appuser——entrypoint 需以 root 启动修正 /data 权限后再切
 EXPOSE 3000

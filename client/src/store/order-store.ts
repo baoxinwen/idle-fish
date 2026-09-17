@@ -13,7 +13,7 @@ import {
   type OrderRecord,
   type Settings,
   type ShippingAddress,
-} from '@idlefish/shared';
+} from '@idle-fish/shared';
 
 /** 订单编辑表单（与后端 create/update 入参对齐） */
 export interface OrderFormState {

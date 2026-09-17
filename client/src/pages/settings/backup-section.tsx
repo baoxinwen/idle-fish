@@ -25,7 +25,7 @@ export function BackupSection() {
       a.href = url;
       // 文件名加时分，避免同天多次导出覆盖
       const ts = new Date().toISOString().slice(0, 16).replace('T', '-');
-      a.download = `idlefish-backup-${ts}.db`;
+      a.download = `idle-fish-backup-${ts}.db`;
       a.click();
       URL.revokeObjectURL(url);
       toast('已导出备份');

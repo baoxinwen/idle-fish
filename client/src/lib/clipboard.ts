@@ -2,10 +2,10 @@
  * 报价文本生成（复制到剪贴板用）。
  */
 
-import type { AccessoryCategory, QuoteResult } from '@idlefish/shared';
-import { calcProfileCost, getProfileUnitPrice } from '@idlefish/shared';
+import type { AccessoryCategory, QuoteResult } from '@idle-fish/shared';
+import { calcProfileCost, getProfileUnitPrice } from '@idle-fish/shared';
 import { CATEGORY_LABEL, COLOR_LABEL } from './status';
-import type { QuoteInput } from '@idlefish/shared';
+import type { QuoteInput } from '@idle-fish/shared';
 import { formatMoney } from './utils';
 
 /** 材料清单文本（无价格，过滤数量 0） */

@@ -3,7 +3,7 @@
  */
 
 import { Router } from 'express';
-import { DEFAULT_SETTINGS, settingsSchema, type Settings } from '@idlefish/shared';
+import { DEFAULT_SETTINGS, settingsSchema, type Settings } from '@idle-fish/shared';
 import { getDb } from '../db/index.js';
 import { nowIso } from '../lib/no.js';
 import { log } from '../lib/logger.js';

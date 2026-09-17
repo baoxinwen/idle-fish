@@ -15,7 +15,7 @@ import type {
   ShippingAddress,
   CabinetSize,
   AccessoryItem,
-} from '@idlefish/shared';
+} from '@idle-fish/shared';
 
 /** 订单创建/编辑入参（与后端 createOrderBodySchema 对齐） */
 export interface OrderCreateBody {
