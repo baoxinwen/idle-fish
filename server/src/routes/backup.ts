@@ -12,6 +12,8 @@ import { pipeline } from 'node:stream/promises';
 import type { Database as DBType } from 'better-sqlite3';
 import { getDb, getDbPath, closeDb, openDatabaseForVerify } from '../db/index.js';
 import { log } from '../lib/logger.js';
+import { rollbackRestore } from '../lib/restore-rollback.js';
+import { asyncHandler } from '../lib/http-error.js';
 
 /** 保留最近 N 份恢复前自动备份，超出清理（避免长期堆积） */
 const MAX_AUTO_BACKUPS = 5;
@@ -77,7 +79,7 @@ function pruneAutoBackups(dir: string): void {
     return;
   }
   const backups = entries
-    .filter((f) => f.startsWith('idlefish-before-restore-') && f.endsWith('.db'))
+    .filter((f) => f.startsWith('idle-fish-before-restore-') && f.endsWith('.db'))
     .map((f) => ({ f, mtime: statSync(join(dir, f)).mtimeMs }))
     .sort((a, b) => b.mtime - a.mtime); // 新在前
   for (const { f } of backups.slice(MAX_AUTO_BACKUPS)) {
@@ -109,12 +111,18 @@ backupRouter.get('/', async (_req, res) => {
   try {
     await getDb().backup(snapshotPath);
     res.setHeader('Content-Type', 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="idlefish-backup-${date}.db"`);
+    res.setHeader('Content-Disposition', `attachment; filename="idle-fish-backup-${date}.db"`);
     res.setHeader('Content-Length', statSync(snapshotPath).size);
     res.setHeader('Cache-Control', 'no-store'); // 整库备份禁止任何中间层缓存
     log.info('backup', '导出数据库', { ip: _req.ip });
     await pipeline(createReadStream(snapshotPath), res);
   } catch (err) {
+    // M-3：客户端取消下载（ERR_STREAM_PREMATURE_CLOSE）属正常操作，降为 info，
+    // 避免例行中止污染 error 日志掩盖真实故障
+    if ((err as { code?: string })?.code === 'ERR_STREAM_PREMATURE_CLOSE') {
+      log.info('backup', '导出中断：客户端取消下载', { ip: _req.ip });
+      return;
+    }
     const msg = err instanceof Error ? err.message : String(err);
     log.error('backup', `导出失败: ${msg}`);
     if (!res.headersSent) {
@@ -148,14 +156,20 @@ async function replaceDbFile(target: string, src: string): Promise<void> {
 }
 
 // 导入恢复
-backupRouter.post('/restore', upload.single('file'), async (req, res) => {
+// M-1：async rejection 必须经 asyncHandler 转发（Express 4 不转发，裸 async 会悬挂请求）
+backupRouter.post('/restore', upload.single('file'), asyncHandler(async (req, res) => {
   if (!req.file) return res.status(400).json({ error: '未上传文件' });
   const dbPath = getDbPath();
   const dir = dirname(dbPath);
 
   // 1) 先校验上传文件是合法 SQLite，不合法直接拒绝，不触碰原库
   if (!isSqliteFile(req.file.path)) {
-    unlinkSync(req.file.path);
+    // M-1：临时文件清理失败（如 Windows 杀软短暂锁定）不应使请求悬挂
+    try {
+      unlinkSync(req.file.path);
+    } catch {
+      // 残留由启动清扫兜底
+    }
     return res.status(400).json({ error: '文件不是有效的 SQLite 数据库' });
   }
 
@@ -178,6 +192,9 @@ backupRouter.post('/restore', upload.single('file'), async (req, res) => {
   }
 
   let autoBackupPath: string | null = null;
+  // C-1：copyFileSync 成功完成后才置 true。回滚决策依赖此标志——
+  // 复制中途失败时 dbPath 仍是完好原库，绝不可被残缺副本顶替。
+  let autoBackupReady = false;
   try {
     // 3) 先把当前库 WAL 合并进主文件（TRUNCATE），保证后续备份/替换拿到完整数据；
     //    checkpoint 失败不阻断（极端情况备份略旧）
@@ -194,8 +211,9 @@ backupRouter.post('/restore', upload.single('file'), async (req, res) => {
     //    消除「closeDb 后、替换前」dbPath 缺失的崩溃窗口（崩溃时重启不会建出空库）
     if (existsSync(dbPath)) {
       const ts = Date.now();
-      autoBackupPath = join(dir, `idlefish-before-restore-${ts}.db`);
+      autoBackupPath = join(dir, `idle-fish-before-restore-${ts}.db`);
       copyFileSync(dbPath, autoBackupPath);
+      autoBackupReady = true;
     }
 
     // 6) 用上传文件替换 dbPath（S-5：跨平台三级降级链抽为独立函数）
@@ -234,30 +252,34 @@ backupRouter.post('/restore', upload.single('file'), async (req, res) => {
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     log.error('backup', `恢复失败: ${errMsg}`, { ip: req.ip });
-    // 回滚：把 autoBackup 移回 dbPath，恢复连接，避免应用持续不可用
+    // 回滚：把 autoBackup 移回 dbPath，恢复连接，避免应用持续不可用。
+    // rollbackRestore 区分失败阶段：复制中途失败时保留完好原库、只清理残缺副本（C-1）
     try {
-      if (autoBackupPath && existsSync(autoBackupPath)) {
-        if (existsSync(dbPath)) unlinkSync(dbPath); // 删除损坏的 dbPath
-        renameSync(autoBackupPath, dbPath);
-      }
+      rollbackRestore({ dbPath, autoBackupPath, autoBackupReady });
       getDb(); // 重新打开原库
     } catch (rollbackErr) {
       const rollMsg = rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr);
       log.error('backup', `恢复失败且回滚失败: ${rollMsg}`, { ip: req.ip });
       // 不回传 err/rollback 详情（Error message 可能含绝对路径），只给处置指引
       return res.status(500).json({
-        error: '恢复失败且回滚失败，请手动恢复 data 目录下的 idlefish-before-restore-*.db',
+        error: '恢复失败且回滚失败，请手动恢复 data 目录下的 idle-fish-before-restore-*.db',
       });
     }
     res.status(500).json({ error: '恢复失败，已回滚到原库' });
   }
-});
+}));
 
-// 启动时清扫上次运行残留的上传临时文件：
-// multer 在「上传完成后的处理失败」路径会清理临时文件，但进程被 SIGKILL/OOM 打断时来不及清理，
-// 残留会随时间堆积。启动瞬间不可能有进行中的上传，全量清空安全。
+// 启动时清扫上次运行残留的临时文件：
+//  - _uploads/：multer 上传临时文件（上传完成后的处理失败路径会清理，进程被 SIGKILL/OOM 打断时来不及）
+//  - _export-*.tmp：备份导出快照（M-2：finally unlink 覆盖不到进程被杀的场景）
+// 启动瞬间不可能有进行中的上传/导出，全量清空安全。
 try {
-  const uploadsDir = join(dirname(getDbPath()), '_uploads');
+  const dataDir = dirname(getDbPath());
+  for (const f of readdirSync(dataDir)) {
+    if (!(f.startsWith('_export-') && f.endsWith('.tmp'))) continue;
+    try { unlinkSync(join(dataDir, f)); } catch { /* 单个失败忽略 */ }
+  }
+  const uploadsDir = join(dataDir, '_uploads');
   for (const f of readdirSync(uploadsDir)) {
     try { unlinkSync(join(uploadsDir, f)); } catch { /* 单个失败忽略 */ }
   }
