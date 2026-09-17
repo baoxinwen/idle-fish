@@ -5,13 +5,16 @@
  * 移动端：名称整行，数量/单价/小计/删除同行；两套布局均为受控绑定同一 item。
  */
 
+import { useEffect, useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { formatMoney } from '@/lib/utils';
-import type { AccessoryItem } from '@idlefish/shared';
+import type { AccessoryItem } from '@idle-fish/shared';
 
 /** M10/F-03：输入收敛统一走 lib/input-sanitize，杜绝 Infinity 与负单价流入实时计价 */
 import { toCount, toPrice } from '@/lib/input-sanitize';
+/** C-2：number 输入中间态提交策略（与 NumberField 共用） */
+import { parseNumberInput } from '@/lib/number-input';
 
 interface AccessoryRowProps {
   item: AccessoryItem;
@@ -95,6 +98,14 @@ function NumCell({
   compact?: boolean;
   onChange: (v: number) => void;
 }) {
+  // C-2：受控 number 输入直接绑定数值 prop 时，键入小数点的净化空串会以 Number("")=0
+  // 实时回写，react-dom 再把 0 写回 DOM 擦掉输入中的内容（"12.5" 落库成 5）。
+  // 改为本地 text 态 + 仅提交可解析值，失焦统一收口（与 NumberField 同一策略）。
+  const [text, setText] = useState(String(value));
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) setText(String(value));
+  }, [value]);
   return (
     <div>
       {!compact && <label className="mb-1 block text-xs text-muted-foreground">{label}</label>}
@@ -102,9 +113,24 @@ function NumCell({
         type="number"
         min={0}
         step={decimal ? 0.01 : 1}
-        value={value}
-        onFocus={(e) => e.target.select()}
-        onChange={(e) => onChange(Number(e.target.value))}
+        value={text}
+        onFocus={(e) => {
+          focused.current = true;
+          e.target.select();
+        }}
+        onBlur={(e) => {
+          focused.current = false;
+          // 空串 → 0（清空语义）；非法中间态（DOM 已净化）不提交，还原受控值
+          if (!e.target.validity.badInput) {
+            onChange(parseNumberInput(text) ?? 0);
+          }
+          setText(String(value));
+        }}
+        onChange={(e) => {
+          setText(e.target.value);
+          const n = parseNumberInput(e.target.value);
+          if (n !== null) onChange(n);
+        }}
         aria-label={compact ? label : undefined}
         className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
       />

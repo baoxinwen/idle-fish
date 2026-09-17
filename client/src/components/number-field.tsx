@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { parseNumberInput } from '@/lib/number-input';
 
 interface NumberFieldProps {
   label?: string;
@@ -94,14 +95,17 @@ export function NumberField({
             // 全选：点击即覆盖，不必先手动清零
             e.target.select();
           }}
-          onBlur={() => {
+          onBlur={(e) => {
             setFocused(false);
-            commit(text);
+            // I-4：非法中间态（如停在 "12."，DOM 已净化为 ""）不提交——
+            // 提交空串会把原值覆盖成 emptyValue(0)；显示还原由下一行处理
+            if (!e.target.validity.badInput) commit(text);
             setText(formatValue(Number.isFinite(Number(text)) && text.trim() !== '' ? Number(text) : value, displayDecimals));
           }}
           onChange={(e) => {
             setText(e.target.value);
-            commit(e.target.value);
+            // I-4：空串/非法中间态不实时提交（避免把 0 推进计价 store），失焦统一收口
+            if (parseNumberInput(e.target.value) !== null) commit(e.target.value);
           }}
           aria-invalid={!!error}
           className="tabular"
