@@ -24,7 +24,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 测试工具链需要 Node 22（jsdom 30 的 undici 依赖用到 markAsUncloneable）；
+          # 应用运行时镜像仍为 node:20，不受影响
+          node-version: 22
 
       - name: Enable pnpm
         run: corepack enable && corepack prepare pnpm@10.18.1 --activate
