@@ -27,10 +27,11 @@ export function ParamRow({ label, unit, value, onChange, emptyValue, displayDeci
   return (
     <div className="flex items-center gap-3 border-b border-border/60 py-2 last:border-0">
       <span className="w-24 shrink-0 text-sm text-muted-foreground sm:w-28">{label}</span>
+      {/* min-w 兜底：挤压时输入框保持可见可点，不可塌缩成竖条（宁可轻微溢出） */}
       {percent ? (
-        <ProfitRateField label="" suffix="" value={value} onChange={onChange} className="flex-1" />
+        <ProfitRateField label="" suffix="" value={value} onChange={onChange} className="min-w-16 flex-1" />
       ) : wastage ? (
-        <WastageField label="" suffix="" value={value} onChange={onChange} className="flex-1" />
+        <WastageField label="" suffix="" value={value} onChange={onChange} className="min-w-16 flex-1" />
       ) : (
         <NumberField
           label=""
@@ -40,7 +41,7 @@ export function ParamRow({ label, unit, value, onChange, emptyValue, displayDeci
           emptyValue={emptyValue}
           displayDecimals={displayDecimals}
           unclamped={unclamped}
-          className="flex-1"
+          className="min-w-16 flex-1"
         />
       )}
       <span className="w-10 shrink-0 text-xs text-muted-foreground">{unit}</span>

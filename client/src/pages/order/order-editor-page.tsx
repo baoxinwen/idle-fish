@@ -442,7 +442,7 @@ export function OrderEditorPage() {
                 </Button>
               )}
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 [container-type:inline-size]">
               {groupedMaterials.length === 0 ? (
                 <div className="rounded-md border border-dashed py-3 text-center text-xs text-muted-foreground">
                   无材料
@@ -451,7 +451,7 @@ export function OrderEditorPage() {
                 groupedMaterials.map(({ cat, items }) => (
                   <div key={cat} className="space-y-2">
                     <Label className="text-xs text-muted-foreground">{CATEGORY_LABEL[cat]}</Label>
-                    <div className="hidden grid-cols-[minmax(0,1fr)_72px_88px_88px_32px] items-end gap-2 border-b border-border pb-1 text-xs text-muted-foreground sm:grid">
+                    <div className="hidden grid-cols-[minmax(0,1fr)_72px_88px_88px_32px] items-end gap-2 border-b border-border pb-1 text-xs text-muted-foreground [@container(min-width:430px)]:grid">
                       <div>名称</div>
                       <div className="text-right">数量</div>
                       <div className="text-right">单价</div>

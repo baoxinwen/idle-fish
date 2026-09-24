@@ -33,8 +33,11 @@ export function AccessoryRow({ item, index, onUpdate, onRemove, nameEditable, sh
 
   return (
     <>
-      {/* 移动端 */}
-      <div className="border-b border-border/60 py-2 last:border-0 sm:hidden">
+      {/* 移动端/窄容器：名称整行。桌面五列网格是否启用由最近 @container 容器的
+          实际宽度决定（430px 为五列固定开销 312px + 名称可用 ≥118px 的门槛）——
+          本组件位于报价/订单页的半宽列内，视口断点无法表达列宽（lg 时列减半），
+          按 sm: 切换曾把名称列压到 0px（1024 视口实测），见布局回归测试 */}
+      <div className="border-b border-border/60 py-2 last:border-0 [@container(min-width:430px)]:hidden">
         <label className="mb-1 block text-xs text-muted-foreground">名称</label>
         {nameEditable ? (
           <Input
@@ -57,9 +60,9 @@ export function AccessoryRow({ item, index, onUpdate, onRemove, nameEditable, sh
         </div>
       </div>
 
-      {/* sm+：固定五列网格 */}
+      {/* sm+：固定五列网格（容器 ≥430px 时启用） */}
       <div
-        className="hidden items-center gap-2 border-b border-border/60 py-1.5 last:border-0 sm:grid"
+        className="hidden items-center gap-2 border-b border-border/60 py-1.5 last:border-0 [@container(min-width:430px)]:grid"
         style={{ gridTemplateColumns: 'minmax(0,1fr) 72px 88px 88px 32px' }}
       >
         <div className="min-w-0">

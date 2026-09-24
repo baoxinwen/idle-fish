@@ -59,3 +59,28 @@ describe('AccessoryRow NumCell（C-2）', () => {
     expect(quantityCalls).not.toContain(0);
   });
 });
+
+/**
+ * 布局回归（配件名称列被压成 0px）：本组件位于报价/订单页的半宽列内
+ * （lg 起页面双栏、列宽减半），五列定宽网格（固定开销 312px）曾按视口断点
+ * sm: 启用——1024 视口下列宽仅 ~297px，minmax(0,1fr) 的名称列被压到 0px。
+ * 修复：桌面五列网格改由最近 @container 容器的实际宽度决定（≥430px 才启用），
+ * jsdom 无布局引擎，这里锁定结构性契约。
+ */
+describe('AccessoryRow 布局契约（名称列被压成 0px 回归）', () => {
+  it('桌面五列网格由容器查询启用，不按视口断点（sm:）启用', () => {
+    render(<AccessoryRow item={item} index={0} onUpdate={vi.fn()} nameEditable />);
+    const desktopRow = document.querySelector('div[style*="grid-template-columns"][class*="hidden"]');
+    expect(desktopRow).toBeTruthy();
+    expect(desktopRow!.className).toContain('[@container(min-width:430px)]:grid');
+    expect(desktopRow!.className).not.toMatch(/sm:grid/);
+  });
+
+  it('移动端变体由同一容器查询收起，不依赖视口断点', () => {
+    render(<AccessoryRow item={item} index={0} onUpdate={vi.fn()} nameEditable />);
+    const mobileRow = document.querySelector('div[class*="border-border/60 py-2"]');
+    expect(mobileRow).toBeTruthy();
+    expect(mobileRow!.className).toContain('[@container(min-width:430px)]:hidden');
+    expect(mobileRow!.className).not.toMatch(/sm:hidden/);
+  });
+});

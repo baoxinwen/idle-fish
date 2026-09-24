@@ -132,9 +132,9 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
         <CardHeader className="pb-3">
           <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">配件清单</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* sm+ 表头：与配件行固定五列对齐 */}
-          <div className="hidden grid-cols-[minmax(0,1fr)_72px_88px_88px_32px] items-end gap-2 border-b border-border pb-1 text-xs text-muted-foreground sm:grid">
+        <CardContent className="space-y-4 [container-type:inline-size]">
+          {/* 容器 ≥430px 的表头：与配件行固定五列对齐（断点逻辑见 AccessoryRow） */}
+          <div className="hidden grid-cols-[minmax(0,1fr)_72px_88px_88px_32px] items-end gap-2 border-b border-border pb-1 text-xs text-muted-foreground [@container(min-width:430px)]:grid">
             <div>名称</div>
             <div className="text-right">数量</div>
             <div className="text-right">单价</div>
@@ -238,7 +238,9 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
           )}
         </div>
         {showPricing && (
-          <CardContent className="grid grid-cols-1 gap-x-8 pt-0 lg:grid-cols-2">
+          // 单列：本卡片位于报价页左列（lg 起仅占约一半宽度），再按视口断点切两列
+          // 会把 ParamRow 挤到输入框塌缩成竖条（固定开销 176px > 列宽），见布局回归测试
+          <CardContent className="grid grid-cols-1 pt-0">
             <div>
               <div className="label-mono mb-1 border-b border-border pb-1 text-[10px] text-muted-foreground/70">型材</div>
               <ParamRow label="银色单价" unit="元/m" value={input.pricing.silverPrice} onChange={(v) => setPricing({ silverPrice: v })} displayDecimals={2} />
@@ -247,7 +249,7 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
               <ParamRow label="毛利率" unit="%" value={input.pricing.profitRate} onChange={(v) => setPricing({ profitRate: v })} percent />
             </div>
             <div>
-              <div className="label-mono mb-1 mt-3 border-b border-border pb-1 text-[10px] text-muted-foreground/70 lg:mt-0">托盘</div>
+              <div className="label-mono mb-1 mt-3 border-b border-border pb-1 text-[10px] text-muted-foreground/70">托盘</div>
               {/* F-02：托盘系数允许负值（与设置页/shared schema 口径一致），必须传 unclamped */}
               <ParamRow label="托盘系数 A" unit="" value={input.pricing.trayCoeffA} onChange={(v) => setPricing({ trayCoeffA: v })} unclamped />
               <ParamRow label="托盘系数 B" unit="" value={input.pricing.trayCoeffB} onChange={(v) => setPricing({ trayCoeffB: v })} unclamped />
