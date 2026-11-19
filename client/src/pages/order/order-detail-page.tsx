@@ -167,7 +167,6 @@ export function OrderDetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <div className="label-mono text-[10px] text-accent">ORDER · 订单</div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold tabular">{record.orderNo}</h1>
               <Badge variant={ORDER_STATUS_BADGE[record.status]}>

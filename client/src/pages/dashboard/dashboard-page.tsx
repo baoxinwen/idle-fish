@@ -30,7 +30,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import type { TooltipProps } from 'recharts';
-import { FileText, Package, DollarSign, Target, BarChart3, AlertTriangle } from 'lucide-react';
+import { BarChart3, AlertTriangle } from 'lucide-react';
 const RANGES: { key: StatsRange; label: string }[] = [
   { key: '7d', label: '近 7 天' },
   { key: '30d', label: '近 30 天' },
@@ -132,8 +132,7 @@ export function DashboardPage() {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="label-mono text-accent">DASHBOARD · 统计</div>
-          <h1 className="mt-1 text-xl font-bold tracking-tight lg:text-2xl">经营统计</h1>
+          <h1 className="text-xl font-bold tracking-tight lg:text-2xl">经营统计</h1>
           <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
             报价与订单数据、利润趋势、状态分布
           </p>
@@ -160,20 +159,17 @@ export function DashboardPage() {
           label="报价数"
           value={String(data.quoteCount)}
           hint={`总金额 ${formatCompactMoney(data.quoteTotalAmount)}`}
-          icon={FileText}
         />
-        <StatCard label="转订单率" value={`${data.conversionRatePct}%`} icon={Target} />
+        <StatCard label="转订单率" value={`${data.conversionRatePct}%`} />
         <StatCard
           label="订单数"
           value={String(data.orderCount)}
           hint={`总营收 ${formatCompactMoney(data.orderRevenue)}`}
-          icon={Package}
         />
         <StatCard
           label="总利润"
           value={formatMoney(data.totalProfit)}
           hint={`平均毛利率 ${data.avgProfitRatePct}%`}
-          icon={DollarSign}
           accent={data.totalProfit >= 0 ? 'gold' : 'bad'}
         />
       </div>

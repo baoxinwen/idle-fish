@@ -10,10 +10,10 @@ import { modKeyLabel } from '@/lib/platform';
 import { cn } from '@/lib/utils';
 
 const navItems = [
-  { to: '/quotes', label: '报价', icon: FileText, code: 'QTE' },
-  { to: '/orders', label: '订单', icon: Package, code: 'ORD' },
-  { to: '/dashboard', label: '统计', icon: BarChart3, code: 'RPT' },
-  { to: '/settings', label: '设置', icon: Settings, code: 'SET' },
+  { to: '/quotes', label: '报价', icon: FileText },
+  { to: '/orders', label: '订单', icon: Package },
+  { to: '/dashboard', label: '统计', icon: BarChart3 },
+  { to: '/settings', label: '设置', icon: Settings },
 ];
 
 export function AppLayout() {
@@ -59,7 +59,7 @@ export function AppLayout() {
         </div>
         <nav className="flex flex-1 flex-col gap-0.5 p-3">
           <div className="label-mono px-3 pb-2 pt-3 text-sidebar-foreground/40">主菜单</div>
-          {navItems.map(({ to, label, icon: Icon, code }) => (
+          {navItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -81,14 +81,6 @@ export function AppLayout() {
                   )}
                   <Icon className="h-4 w-4" />
                   <span className="flex-1">{label}</span>
-                  <span
-                    className={cn(
-                      'font-mono-display text-[10px] tracking-wider transition-opacity',
-                      isActive ? 'text-accent/80' : 'text-sidebar-foreground/30',
-                    )}
-                  >
-                    {code}
-                  </span>
                 </>
               )}
             </NavLink>

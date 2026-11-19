@@ -177,7 +177,6 @@ export function QuoteEditorPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <div className="label-mono text-[10px] text-accent">QUOTE · 报价</div>
             <h1 className="text-xl font-bold">{editingId ? '编辑报价' : '新建报价'}</h1>
             {editingId && !statusLabel && (
               <p className="hidden text-xs text-muted-foreground sm:block">修改后保存将更新此报价</p>

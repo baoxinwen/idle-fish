@@ -92,8 +92,7 @@ export function SettingsPage() {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <div className="label-mono text-accent">SETTINGS · 设置</div>
-          <h1 className="mt-1 text-xl font-bold tracking-tight lg:text-2xl">设置</h1>
+          <h1 className="text-xl font-bold tracking-tight lg:text-2xl">设置</h1>
           <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
             品牌信息、默认机柜参数、计价参数、配件配置
           </p>

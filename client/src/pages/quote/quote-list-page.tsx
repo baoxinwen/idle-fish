@@ -100,7 +100,6 @@ export function QuoteListPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow="QUOTES · 报价"
         title="报价管理"
         description="新建报价、查看历史、一键转订单"
         actions={

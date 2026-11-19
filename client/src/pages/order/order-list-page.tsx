@@ -100,7 +100,6 @@ export function OrderListPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        eyebrow="ORDERS · 订单"
         title="订单管理"
         description="待生产 → 生产中 → 待发货 → 已发货 → 已完成"
         actions={

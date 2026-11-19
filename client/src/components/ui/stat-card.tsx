@@ -5,7 +5,6 @@
 
 import { Card } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import type { LucideIcon } from 'lucide-react';
 
 export type StatAccent = 'default' | 'good' | 'bad' | 'gold';
 
@@ -13,11 +12,10 @@ interface StatCardProps {
   label: string;
   value: string;
   hint?: string;
-  icon?: LucideIcon;
   accent?: StatAccent;
 }
 
-export function StatCard({ label, value, hint, icon: Icon, accent = 'default' }: StatCardProps) {
+export function StatCard({ label, value, hint, accent = 'default' }: StatCardProps) {
   return (
     <Card className="card-hover relative overflow-hidden p-4">
       {/* 左侧强调竖条 */}
@@ -30,9 +28,8 @@ export function StatCard({ label, value, hint, icon: Icon, accent = 'default' }:
           accent === 'default' && 'bg-primary/40',
         )}
       />
-      <div className="flex items-center justify-between pl-3">
+      <div className="pl-3">
         <span className="label-mono text-muted-foreground">{label}</span>
-        {Icon && <Icon className="h-4 w-4 text-muted-foreground/60" />}
       </div>
       <div
         className={cn(
