@@ -14,7 +14,6 @@ import {
   CheckCircle2,
   Factory,
   PackageCheck,
-  Copy,
   ChevronDown,
   ChevronRight,
   AlertTriangle,
@@ -25,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { CopyButton } from '@/components/ui/copy-button';
 import { NumberField } from '@/components/number-field';
 import { ordersApi } from '@/lib/api';
 import { useToast } from '@/components/toaster';
@@ -32,7 +32,6 @@ import { LoadingState, EmptyState } from '@/components/states';
 import { confirmDialog } from '@/components/confirm-dialog';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_BADGE, CATEGORY_LABEL } from '@/lib/status';
 import { formatMoney, formatShortDateTime, cn, profitColor } from '@/lib/utils';
-import { copyText } from '@/lib/clipboard';
 import type { OrderRecord, OrderStatus } from '@idle-fish/shared';
 
 /** 各状态可执行的动作 */
@@ -121,11 +120,6 @@ export function OrderDetailPage() {
     } catch (e) {
       toast(`发货失败：${e}`);
     }
-  }
-
-  async function handleCopyTracking(text: string) {
-    const ok = await copyText(text);
-    toast(ok ? '已复制运单号' : '复制失败');
   }
 
   if (loading) return <LoadingState />;
@@ -410,15 +404,11 @@ export function OrderDetailPage() {
                     value={
                       <span className="inline-flex items-center gap-1.5">
                         {ship.courier} · {ship.trackingNo}
-                        <button
-                          type="button"
-                          title="复制运单号"
-                          aria-label="复制运单号"
-                          onClick={() => handleCopyTracking(ship.trackingNo)}
-                          className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                        </button>
+                        <CopyButton
+                          getText={ship.trackingNo}
+                          label="复制运单号"
+                          onResult={(ok) => toast(ok ? '已复制运单号' : '复制失败')}
+                        />
                       </span>
                     }
                   />

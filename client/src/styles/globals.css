@@ -151,6 +151,27 @@
   .icon-inline {
     vertical-align: -0.125em;
   }
+  /* 铁律9/10：复制成功对勾微弹（欠阻尼 380/18 的关键帧近似：一次过冲 + 一次回弹），
+     2.5s 自熄由组件层负责，这里只管入场。 */
+  @keyframes check-pop {
+    0% {
+      transform: scale(0.5);
+      opacity: 0;
+    }
+    60% {
+      transform: scale(1.18);
+      opacity: 1;
+    }
+    82% {
+      transform: scale(0.94);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  .animate-check-pop {
+    animation: check-pop 0.42s cubic-bezier(0.215, 0.61, 0.355, 1);
+  }
   /* 可交互卡片 hover 微抬升（Emil 风格物理感），阴影走暖色不偏蓝 */
   .card-hover {
     transition:
