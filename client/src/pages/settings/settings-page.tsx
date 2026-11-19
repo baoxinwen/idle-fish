@@ -21,8 +21,11 @@ import { AccessoriesConfig } from './accessories-config';
 import { BackupSection } from './backup-section';
 import { ChangePasswordSection } from './change-password-section';
 import { COLOR_LABEL } from '@/lib/status';
+import { PageHeader } from '@/components/ui/page-header';
+import { usePageTitle } from '@/lib/use-page-title';
 
 export function SettingsPage() {
+  usePageTitle('设置');
   const {
     settings,
     loaded,
@@ -61,7 +64,16 @@ export function SettingsPage() {
   }
 
   async function handleReload() {
-    if (dirty && !(await confirmDialog({ message: '有未保存修改，确认放弃并重新加载？', confirmLabel: '放弃修改' }))) return;
+    if (
+      dirty &&
+      !(await confirmDialog({
+        title: '放弃修改并重载',
+        message: '未保存的修改将丢失。',
+        confirmLabel: '放弃修改',
+        variant: 'destructive',
+      }))
+    )
+      return;
     // F-05：此前裸 await load()——失败时无提示、控制台 unhandledrejection
     try {
       await load();
@@ -90,25 +102,23 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight lg:text-2xl">设置</h1>
-          <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
-            品牌信息、默认机柜参数、计价参数、配件配置
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {dirty && <span className="self-center text-xs text-amber-600 dark:text-amber-400">未保存</span>}
-          <Button variant="outline" onClick={handleReload}>
-            <RotateCcw className="h-4 w-4" />
-            重载
-          </Button>
-          <Button variant="accent" onClick={handleSave} disabled={saving || !dirty}>
-            <Save className="h-4 w-4" />
-            {saving ? '保存中…' : '保存'}
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="设置"
+        description="品牌信息、默认机柜参数、计价参数、配件配置"
+        actions={
+          <div className="flex gap-2">
+            {dirty && <span className="self-center text-xs text-amber-700 dark:text-amber-400">未保存</span>}
+            <Button variant="outline" onClick={handleReload}>
+              <RotateCcw className="h-4 w-4" />
+              重载
+            </Button>
+            <Button variant="accent" onClick={handleSave} disabled={saving || !dirty}>
+              <Save className="h-4 w-4" />
+              {saving ? '保存中…' : '保存'}
+            </Button>
+          </div>
+        }
+      />
 
       {/* 品牌：导出单抬头 */}
       <Card>
@@ -118,8 +128,9 @@ export function SettingsPage() {
         </CardHeader>
         <CardContent className="max-w-md">
           <div className="space-y-1.5">
-            <Label>卖家名称</Label>
+            <Label htmlFor="brand-seller-name">卖家名称</Label>
             <Input
+              id="brand-seller-name"
               value={settings.brand.sellerName}
               onChange={(e) => setBrand({ sellerName: e.target.value })}
               placeholder="如 @某某铝业"
@@ -167,7 +178,7 @@ export function SettingsPage() {
           <div className="grid grid-cols-1 gap-x-10 lg:grid-cols-2">
             {/* 型材 */}
             <div>
-              <div className="label-mono mb-1 border-b border-border pb-1 text-[10px] text-muted-foreground/70">型材</div>
+              <div className="label-mono mb-1 border-b border-border pb-1 text-[10px] text-muted-foreground">型材</div>
               <ParamRow label="银色型材单价" unit="元/m" value={p.silverPrice} onChange={(v) => setPricing({ silverPrice: v })} displayDecimals={2} />
               <ParamRow label="黑色型材单价" unit="元/m" value={p.blackPrice} onChange={(v) => setPricing({ blackPrice: v })} displayDecimals={2} />
               <ParamRow label="损耗率" unit="%" value={p.wastage} onChange={(v) => setPricing({ wastage: v })} wastage />
@@ -175,11 +186,11 @@ export function SettingsPage() {
             </div>
             {/* 费用 + 托盘 */}
             <div>
-              <div className="label-mono mb-1 border-b border-border pb-1 text-[10px] text-muted-foreground/70">费用</div>
+              <div className="label-mono mb-1 border-b border-border pb-1 text-[10px] text-muted-foreground">费用</div>
               <ParamRow label="切割处理费" unit="元" value={p.cuttingFee} onChange={(v) => setPricing({ cuttingFee: v })} displayDecimals={2} />
               <ParamRow label="安装费" unit="元" value={p.installFee} onChange={(v) => setPricing({ installFee: v })} displayDecimals={2} />
               <ParamRow label="运费" unit="元" value={p.freight} onChange={(v) => setPricing({ freight: v })} displayDecimals={2} />
-              <div className="label-mono mb-1 mt-3 border-b border-border pb-1 text-[10px] text-muted-foreground/70">托盘</div>
+              <div className="label-mono mb-1 mt-3 border-b border-border pb-1 text-[10px] text-muted-foreground">托盘</div>
               <ParamRow label="托盘系数 A" unit="" value={p.trayCoeffA} onChange={(v) => setPricing({ trayCoeffA: v })} unclamped />
               <ParamRow label="托盘系数 B" unit="" value={p.trayCoeffB} onChange={(v) => setPricing({ trayCoeffB: v })} unclamped />
             </div>

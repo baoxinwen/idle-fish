@@ -11,8 +11,10 @@ import { Label } from '@/components/ui/label';
 import { PageLoading } from '@/components/page-loading';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { useAuthStore } from '@/store/auth-store';
+import { usePageTitle } from '@/lib/use-page-title';
 
 export function LoginPage() {
+  usePageTitle('登录');
   const { status, needsSetup, loaded, ensureLoaded, login } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
@@ -40,7 +42,7 @@ export function LoginPage() {
       navigate(from, { replace: true });
     } catch {
       // 内联错误（不区分用户名/密码错，统一提示）
-      setError('用户名或密码错误');
+      setError('用户名或密码错误，请重新输入');
       setPassword('');
     } finally {
       setSubmitting(false);
@@ -70,7 +72,11 @@ export function LoginPage() {
           placeholder="密码"
           aria-invalid={!!error}
         />
-        {error && <p className="text-xs text-destructive">{error}</p>}
+        {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
       </div>
       <Button type="submit" variant="accent" disabled={submitting} className="w-full">
         {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}

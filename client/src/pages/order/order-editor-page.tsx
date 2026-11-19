@@ -9,7 +9,7 @@
  *     移动端底部常驻预估利润条。
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Save, ArrowLeft, Plus, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,6 +28,7 @@ import { useDirtyTracking } from '@/lib/use-dirty-tracking';
 import { emptyConvertForm, type ConvertConfirmForm } from '@/lib/convert-form';
 import { ordersApi, quotesApi, settingsApi } from '@/lib/api';
 import { formatMoney, cn } from '@/lib/utils';
+import { usePageTitle } from '@/lib/use-page-title';
 import { calcOrderFinance, roundMoney } from '@idle-fish/shared';
 import { CATEGORY_LABEL } from '@/lib/status';
 import type { AccessoryCategory, AccessoryItem, CabinetSize, QuoteRecord } from '@idle-fish/shared';
@@ -41,6 +42,7 @@ export function OrderEditorPage() {
   const { id } = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
   const fromQuote = searchParams.get('fromQuote');
+  usePageTitle(fromQuote ? '报价转订单' : id ? '编辑订单' : '新建订单');
   const navigate = useNavigate();
   const toast = useToast((s) => s.show);
 
@@ -75,6 +77,9 @@ export function OrderEditorPage() {
   // I-5：加载失败的终止态——此前失败只 toast，页面永久停留「加载中」且无重试
   const [loadError, setLoadError] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
+  // 客户名称必填校验：错误内联在字段旁并聚焦（不再只走 toast）
+  const [customerNameError, setCustomerNameError] = useState<string | null>(null);
+  const customerNameRef = useRef<HTMLInputElement>(null);
 
   // 未保存修改跟踪（I-2：抽为共用 hook——保存必须 markSaved()，
   // 悬挂的 justLoaded 会把保存后的第一次编辑吞成基线、令离开守卫失效）
@@ -159,12 +164,14 @@ export function OrderEditorPage() {
   }, [mode, quote, convertForm.finance, form]);
 
   async function handleSave() {
-    // 必填校验
+    // 必填校验：错误落在字段旁（toast 够不着出错位置），并聚焦首个出错字段
     const customerName = mode === 'convert' ? convertForm.customer.name : form.customer.name;
     if (!customerName.trim()) {
-      toast('请填写客户名称');
+      setCustomerNameError('请填写客户名称');
+      customerNameRef.current?.focus();
       return;
     }
+    setCustomerNameError(null);
     setSaving(true);
     try {
       if (mode === 'convert' && fromQuote && quote) {
@@ -332,13 +339,13 @@ export function OrderEditorPage() {
       {/* 操作栏 sticky：长表单时保存始终可达 */}
       <div className="sticky top-0 z-20 -mx-3 flex flex-col gap-3 border-b bg-background/80 px-3 py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between lg:-mx-6 lg:px-6">
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/orders')}>
+          <Button variant="ghost" size="icon" aria-label="返回列表" onClick={() => navigate('/orders')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <h1 className="text-xl font-bold">
             {mode === 'convert' ? '报价转订单' : mode === 'edit' ? '编辑订单' : '新建订单'}
           </h1>
-          <span className="label-mono hidden text-[10px] text-accent sm:block">ORDER · 订单</span>
+          <span className="label-mono hidden text-[10px] text-accent-strong sm:block">ORDER · 订单</span>
         </div>
         <div className="flex gap-2 lg:hidden">
           <Button variant="outline" onClick={() => navigate('/orders')}>取消</Button>
@@ -365,32 +372,49 @@ export function OrderEditorPage() {
             <CardContent className="space-y-3">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label>客户名称 *</Label>
+                  <Label htmlFor="order-customer-name">客户名称 *</Label>
                   <Input
+                    id="order-customer-name"
+                    ref={customerNameRef}
                     value={customer.name}
-                    onChange={(e) => bindCustomer({ name: e.target.value })}
+                    onChange={(e) => {
+                      bindCustomer({ name: e.target.value });
+                      if (customerNameError) setCustomerNameError(null);
+                    }}
                     placeholder="客户名称"
+                    aria-invalid={customerNameError ? true : undefined}
+                    aria-describedby={customerNameError ? 'order-customer-name-error' : undefined}
                   />
+                  {customerNameError && (
+                    <p id="order-customer-name-error" className="text-xs text-destructive">
+                      {customerNameError}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>平台订单号</Label>
+                  <Label htmlFor="order-platform-no">平台订单号</Label>
                   <Input
+                    id="order-platform-no"
                     value={customer.platformOrderNo}
                     onChange={(e) => bindCustomer({ platformOrderNo: e.target.value })}
                     placeholder="如淘宝/京东订单号"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>收件人</Label>
+                  <Label htmlFor="order-receiver">收件人</Label>
                   <Input
+                    id="order-receiver"
                     value={shippingAddress.receiver}
                     onChange={(e) => bindAddress({ receiver: e.target.value })}
                     placeholder="收件人姓名"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>电话</Label>
+                  <Label htmlFor="order-phone">电话</Label>
                   <Input
+                    id="order-phone"
+                    type="tel"
+                    inputMode="tel"
                     value={shippingAddress.phone}
                     onChange={(e) => bindAddress({ phone: e.target.value })}
                     placeholder="手机号码"
@@ -398,8 +422,9 @@ export function OrderEditorPage() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>收货地址</Label>
+                <Label htmlFor="order-address">收货地址</Label>
                 <Input
+                  id="order-address"
                   value={shippingAddress.address}
                   onChange={(e) => bindAddress({ address: e.target.value })}
                   placeholder="省市区详细地址"
@@ -530,7 +555,7 @@ export function OrderEditorPage() {
                   <>
                     <FinanceRow label="预估利润" value={formatMoney(finance.estimatedProfit)} muted />
                     <FinanceRow label="预估毛利率" value={`${finance.estimatedProfitRatePct}%`} muted />
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
                       材料成本为 0，利润仅供参考——请在清单中填写单价或手工填入材料成本后再判断盈亏。
                     </p>
                   </>
@@ -547,8 +572,9 @@ export function OrderEditorPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label>备注</Label>
+                <Label htmlFor="order-remark">备注</Label>
                 <Input
+                  id="order-remark"
                   value={remark}
                   onChange={(e) =>
                     mode === 'convert'
@@ -590,7 +616,7 @@ export function OrderEditorPage() {
 function BackBar({ onBack, title }: { onBack: () => void; title: string }) {
   return (
     <div className="flex items-center gap-3">
-      <Button variant="ghost" size="icon" onClick={onBack}>
+      <Button variant="ghost" size="icon" aria-label="返回列表" onClick={onBack}>
         <ArrowLeft className="h-4 w-4" />
       </Button>
       <h1 className="text-xl font-bold">{title}</h1>
@@ -616,7 +642,7 @@ function FinanceRow({
         className={cn(
           'tabular font-semibold',
           !accent && !muted && 'text-foreground',
-          accent === 'good' && 'text-emerald-600 dark:text-emerald-400',
+          accent === 'good' && 'text-emerald-700 dark:text-emerald-400',
           accent === 'bad' && 'text-destructive',
           muted && 'font-normal text-muted-foreground',
         )}

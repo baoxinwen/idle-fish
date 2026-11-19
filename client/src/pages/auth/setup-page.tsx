@@ -13,9 +13,11 @@ import { Label } from '@/components/ui/label';
 import { PageLoading } from '@/components/page-loading';
 import { AuthShell } from '@/components/auth/auth-shell';
 import { useAuthStore } from '@/store/auth-store';
+import { usePageTitle } from '@/lib/use-page-title';
 import { setupSchema } from '@idle-fish/shared';
 
 export function SetupPage() {
+  usePageTitle('初始化账户');
   const { needsSetup, loaded, ensureLoaded, setup } = useAuthStore();
   const navigate = useNavigate();
   const [setupToken, setSetupToken] = useState('');
@@ -105,7 +107,11 @@ export function SetupPage() {
           placeholder="再次输入密码"
         />
       </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      )}
       <Button type="submit" variant="accent" disabled={submitting} className="w-full">
         {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
         {submitting ? '创建中…' : '创建账户并登录'}

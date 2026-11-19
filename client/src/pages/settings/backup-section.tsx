@@ -39,7 +39,14 @@ export function BackupSection() {
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!(await confirmDialog({ message: '导入将覆盖当前全部数据，且已自动备份原库。确认继续？', confirmLabel: '导入恢复', variant: 'destructive' }))) {
+    if (
+      !(await confirmDialog({
+        title: '导入恢复',
+        message: '导入将覆盖当前全部数据（报价、订单、设置、账户），覆盖内容不可找回。恢复前会自动备份当前库。',
+        confirmLabel: '导入恢复',
+        variant: 'destructive',
+      }))
+    ) {
       e.target.value = '';
       return;
     }

@@ -21,6 +21,7 @@ import { useDirtyTracking } from '@/lib/use-dirty-tracking';
 import { useToast } from '@/components/toaster';
 import { quotesApi, settingsApi } from '@/lib/api';
 import { formatMoney } from '@/lib/utils';
+import { usePageTitle } from '@/lib/use-page-title';
 import { calcQuote, type QuoteRecord, type Settings } from '@idle-fish/shared';
 
 export function QuoteEditorPage() {
@@ -37,6 +38,7 @@ export function QuoteEditorPage() {
     markLoading,
     invalidateEditing,
   } = useQuoteStore();
+  usePageTitle(editingId ? '编辑报价' : '新建报价');
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
   const [exportQuote, setExportQuote] = useState<QuoteRecord | null>(null);
@@ -182,7 +184,7 @@ export function QuoteEditorPage() {
       {/* 操作栏 sticky：长表单时保存/转单始终可达 */}
       <div className="sticky top-0 z-20 -mx-3 flex flex-col gap-3 border-b bg-background/80 px-3 py-3 backdrop-blur-md sm:flex-row sm:items-center sm:justify-between lg:-mx-6 lg:px-6">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/quotes')}>
+          <Button variant="ghost" size="icon" aria-label="返回列表" onClick={() => navigate('/quotes')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -256,6 +258,7 @@ export function QuoteEditorPage() {
           {/* 移动端折叠的 3D 预览 */}
           <button
             type="button"
+            aria-expanded={mobilePreviewOpen}
             className="flex w-full items-center justify-between rounded-lg border bg-card px-4 py-2.5 text-sm font-medium lg:hidden"
             onClick={() => setMobilePreviewOpen((v) => !v)}
           >

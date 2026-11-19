@@ -33,6 +33,7 @@ import { LoadingState, EmptyState } from '@/components/states';
 import { confirmDialog } from '@/components/confirm-dialog';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_BADGE, CATEGORY_LABEL } from '@/lib/status';
 import { formatMoney, formatShortDateTime, cn, profitColor } from '@/lib/utils';
+import { usePageTitle } from '@/lib/use-page-title';
 import type { OrderRecord, OrderStatus } from '@idle-fish/shared';
 
 /** 各状态可执行的动作 */
@@ -63,6 +64,7 @@ export function OrderDetailPage() {
   const navigate = useNavigate();
   const toast = useToast((s) => s.show);
   const [record, setRecord] = useState<OrderRecord | null>(null);
+  usePageTitle(record ? `订单 ${record.orderNo}` : '订单详情');
   const [loading, setLoading] = useState(true);
   // I-5：加载失败标记——此前失败后 record 为 null 会误显「订单不存在」，且无重试
   const [loadError, setLoadError] = useState(false);
@@ -73,6 +75,10 @@ export function OrderDetailPage() {
     actualFreight: 0,
     checkRemark: '',
   });
+  // 发货必填校验：错误内联在字段旁并聚焦首个出错项（不再只走 toast）
+  const [shipErrors, setShipErrors] = useState<{ courier?: string; trackingNo?: string }>({});
+  const shipCourierRef = useRef<HTMLInputElement>(null);
+  const shipTrackingRef = useRef<HTMLInputElement>(null);
   // 零数量材料默认折叠
   const [showZeroMaterials, setShowZeroMaterials] = useState(false);
 
@@ -103,11 +109,12 @@ export function OrderDetailPage() {
   }
 
   async function handleTransition(next: OrderStatus) {
-    if (!id) return;
+    if (!id || !record) return;
     if (
       next === 'cancelled' &&
       !(await confirmDialog({
-        message: '确认取消该订单？',
+        title: '取消订单',
+        message: `订单 ${record.orderNo} 将标记为已取消，取消后不可再流转。`,
         confirmLabel: '取消订单',
         variant: 'destructive',
       }))
@@ -124,10 +131,15 @@ export function OrderDetailPage() {
 
   async function handleShip() {
     if (!id) return;
-    if (!shipForm.courier || !shipForm.trackingNo) {
-      toast('请填写快递公司和运单号');
+    const errors: { courier?: string; trackingNo?: string } = {};
+    if (!shipForm.courier) errors.courier = '请填写快递公司';
+    if (!shipForm.trackingNo) errors.trackingNo = '请填写运单号';
+    if (errors.courier || errors.trackingNo) {
+      setShipErrors(errors);
+      (errors.courier ? shipCourierRef : shipTrackingRef).current?.focus();
       return;
     }
+    setShipErrors({});
     try {
       await ordersApi.ship(id, {
         courier: shipForm.courier,
@@ -138,6 +150,7 @@ export function OrderDetailPage() {
       toast('已确认发货');
       setShipOpen(false);
       setShipForm({ courier: '', trackingNo: '', actualFreight: 0, checkRemark: '' });
+      setShipErrors({});
       refresh();
     } catch (e) {
       toast(`发货失败：${e}`);
@@ -180,7 +193,7 @@ export function OrderDetailPage() {
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/orders')}>
+          <Button variant="ghost" size="icon" aria-label="返回列表" onClick={() => navigate('/orders')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -193,7 +206,7 @@ export function OrderDetailPage() {
             {record.quoteId && (
               <Link
                 to={`/quotes/${record.quoteId}`}
-                className="mt-0.5 inline-block text-xs text-muted-foreground underline-offset-2 hover:text-accent hover:underline"
+                className="mt-0.5 inline-block text-xs text-muted-foreground underline-offset-2 hover:text-accent-strong hover:underline"
               >
                 由报价转入 ↗
               </Link>
@@ -235,7 +248,7 @@ export function OrderDetailPage() {
                             'flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium transition-colors',
                             active &&
                               'bg-accent text-accent-foreground ring-2 ring-accent/30 ring-offset-2 ring-offset-card',
-                            done && 'bg-accent/20 text-accent',
+                            done && 'bg-accent/20 text-accent-strong',
                             !active && !done && 'bg-secondary text-muted-foreground',
                           )}
                         >
@@ -358,6 +371,7 @@ export function OrderDetailPage() {
                     <>
                       <button
                         type="button"
+                        aria-expanded={showZeroMaterials}
                         onClick={() => setShowZeroMaterials((v) => !v)}
                         className="flex w-full items-center gap-1 rounded py-0.5 text-xs text-muted-foreground hover:text-foreground"
                       >
@@ -370,7 +384,7 @@ export function OrderDetailPage() {
                       </button>
                       {/* 铁律7：Grid 折叠动画，替代条件渲染硬切 */}
                       <Collapse open={showZeroMaterials}>
-                        <div className="space-y-1 opacity-60">
+                        <div className="space-y-1">
                           {zeroMaterials.map((m, i) => (
                             <MaterialLine key={`z-${i}`} m={m} />
                           ))}
@@ -496,20 +510,44 @@ export function OrderDetailPage() {
       <Modal open={shipOpen} onClose={() => setShipOpen(false)} title="确认发货">
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label>快递公司</Label>
+            <Label htmlFor="ship-courier">快递公司</Label>
             <Input
+              id="ship-courier"
+              ref={shipCourierRef}
               value={shipForm.courier}
-              onChange={(e) => setShipForm((f) => ({ ...f, courier: e.target.value }))}
+              onChange={(e) => {
+                setShipForm((f) => ({ ...f, courier: e.target.value }));
+                if (shipErrors.courier) setShipErrors((x) => ({ ...x, courier: undefined }));
+              }}
               placeholder="如顺丰、中通"
+              aria-invalid={shipErrors.courier ? true : undefined}
+              aria-describedby={shipErrors.courier ? 'ship-courier-error' : undefined}
             />
+            {shipErrors.courier && (
+              <p id="ship-courier-error" className="text-xs text-destructive">
+                {shipErrors.courier}
+              </p>
+            )}
           </div>
           <div className="space-y-1.5">
-            <Label>运单号</Label>
+            <Label htmlFor="ship-tracking-no">运单号</Label>
             <Input
+              id="ship-tracking-no"
+              ref={shipTrackingRef}
               value={shipForm.trackingNo}
-              onChange={(e) => setShipForm((f) => ({ ...f, trackingNo: e.target.value }))}
+              onChange={(e) => {
+                setShipForm((f) => ({ ...f, trackingNo: e.target.value }));
+                if (shipErrors.trackingNo) setShipErrors((x) => ({ ...x, trackingNo: undefined }));
+              }}
               placeholder="快递运单号"
+              aria-invalid={shipErrors.trackingNo ? true : undefined}
+              aria-describedby={shipErrors.trackingNo ? 'ship-tracking-error' : undefined}
             />
+            {shipErrors.trackingNo && (
+              <p id="ship-tracking-error" className="text-xs text-destructive">
+                {shipErrors.trackingNo}
+              </p>
+            )}
           </div>
           <NumberField
             label="实际运费"
@@ -520,8 +558,9 @@ export function OrderDetailPage() {
             displayDecimals={2}
           />
           <div className="space-y-1.5">
-            <Label>核对备注</Label>
+            <Label htmlFor="ship-check-remark">核对备注</Label>
             <Input
+              id="ship-check-remark"
               value={shipForm.checkRemark}
               onChange={(e) => setShipForm((f) => ({ ...f, checkRemark: e.target.value }))}
               placeholder="发货核对说明"
@@ -565,7 +604,7 @@ function CompareTableHead({ actual }: { actual: boolean }) {
     <div className="mb-1 grid grid-cols-[minmax(0,1fr)_88px_88px_72px] items-center gap-2 border-b border-border pb-1 text-[10px] text-muted-foreground label-mono sm:grid-cols-[minmax(0,1fr)_110px_110px_90px]">
       <div>项目</div>
       <div className="text-right">预估</div>
-      <div className="text-right">{actual ? '实际' : '实际'}</div>
+      <div className="text-right">实际</div>
       <div className="text-right">{actual ? '差异' : ''}</div>
     </div>
   );
@@ -607,14 +646,14 @@ function CompareRow({
       <span
         className={cn(
           'tabular',
-          good ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive',
+          good ? 'text-emerald-700 dark:text-emerald-400' : 'text-destructive',
         )}
       >
         {isPercent ? `${sign}${diff}pp` : `${sign}${formatMoney(diff)}`}
       </span>
     );
   } else if (diff === undefined) {
-    diffNode = <span className="text-muted-foreground/40">—</span>;
+    diffNode = <span className="text-muted-foreground/70">—</span>;
   }
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_88px_88px_72px] items-center gap-2 border-b border-border/50 py-1.5 text-sm last:border-0 sm:grid-cols-[minmax(0,1fr)_110px_110px_90px]">
@@ -635,7 +674,7 @@ function CompareRow({
         className={cn(
           'text-right tabular',
           weight,
-          actual == null ? 'text-muted-foreground/40' : '',
+          actual == null ? 'text-muted-foreground/70' : '',
           valueClass ?? '',
           valueClassOverride?.actual,
         )}
@@ -665,7 +704,7 @@ function InfoRow({
         className={cn(
           'tabular text-right',
           bold && 'font-semibold',
-          accent === 'good' && 'text-emerald-600 dark:text-emerald-400',
+          accent === 'good' && 'text-emerald-700 dark:text-emerald-400',
           accent === 'bad' && 'text-destructive',
         )}
       >
