@@ -239,8 +239,12 @@ export function OrderDetailPage() {
                   <div className="text-sm font-medium">{ORDER_STATUS_LABEL[record.status]}</div>
                   <div className="text-xs text-muted-foreground">第 {currentStep + 1}/{FLOW.length} 步 · {ORDER_STATUS_LABEL[FLOW[currentStep + 1] ?? FLOW[currentStep]]}</div>
                 </div>
-                <div className="ml-auto h-1.5 w-24 overflow-hidden rounded-full bg-secondary">
-                  <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${((currentStep + 1) / FLOW.length) * 100}%` }} />
+                  {/* scaleX 而非 width：布局属性动画在弱设备上会抖 */}
+                  <div
+                    className="h-full w-full origin-left rounded-full bg-accent transition-transform"
+                    style={{ transform: `scaleX(${((currentStep + 1) / FLOW.length) * 100}%)` }}
+                  />
+                </div>
                 </div>
               </div>
             </>
