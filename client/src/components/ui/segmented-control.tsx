@@ -47,7 +47,10 @@ export function SegmentedControl<T extends string>({
             )}
           >
             {o.dot && (
-              <span className="h-3 w-3 rounded-full border border-black/10" style={{ background: o.dot }} />
+              <span
+                className="h-3 w-3 rounded-full border border-foreground/10"
+                style={{ background: o.dot }}
+              />
             )}
             {o.label}
           </button>

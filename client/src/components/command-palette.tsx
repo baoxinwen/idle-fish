@@ -82,7 +82,10 @@ export function CommandPalette() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setOpen(false)} />
+      <div
+        className="absolute inset-0 bg-[#0b0b0a]/45 backdrop-blur-[2px]"
+        onClick={() => setOpen(false)}
+      />
       <Command
         className="relative z-10 w-full max-w-lg overflow-hidden rounded-xl border bg-card shadow-xl"
         onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
@@ -95,10 +98,16 @@ export function CommandPalette() {
           />
         </div>
         <Command.List className="max-h-[380px] overflow-y-auto p-2">
-          <Command.Empty className="py-6 text-center text-sm text-muted-foreground">无匹配结果</Command.Empty>
+          <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
+            无匹配结果
+          </Command.Empty>
 
           {(recentQuotes?.length ?? 0) > 0 && (
-            <Command.Group heading={<span className="label-mono px-3 py-1 text-[10px] text-muted-foreground">报价</span>}>
+            <Command.Group
+              heading={
+                <span className="label-mono px-3 py-1 text-[10px] text-muted-foreground">报价</span>
+              }
+            >
               {recentQuotes!.map((r) => (
                 <PaletteItem
                   key={r.id}
@@ -114,7 +123,11 @@ export function CommandPalette() {
           )}
 
           {(recentOrders?.length ?? 0) > 0 && (
-            <Command.Group heading={<span className="label-mono px-3 py-1 text-[10px] text-muted-foreground">订单</span>}>
+            <Command.Group
+              heading={
+                <span className="label-mono px-3 py-1 text-[10px] text-muted-foreground">订单</span>
+              }
+            >
               {recentOrders!.map((r) => (
                 <PaletteItem
                   key={r.id}
@@ -129,7 +142,11 @@ export function CommandPalette() {
             </Command.Group>
           )}
 
-          <Command.Group heading={<span className="label-mono px-3 py-1 text-[10px] text-muted-foreground">命令</span>}>
+          <Command.Group
+            heading={
+              <span className="label-mono px-3 py-1 text-[10px] text-muted-foreground">命令</span>
+            }
+          >
             {COMMANDS.map((c) => {
               const Icon = c.icon;
               return (
@@ -175,7 +192,9 @@ function PaletteItem({
     >
       <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
       <span className="font-mono-display tabular">{record.primary}</span>
-      <span className="ml-auto truncate pl-3 text-xs text-muted-foreground">{record.secondary}</span>
+      <span className="ml-auto truncate pl-3 text-xs text-muted-foreground">
+        {record.secondary}
+      </span>
     </Command.Item>
   );
 }

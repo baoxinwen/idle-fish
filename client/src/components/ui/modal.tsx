@@ -34,7 +34,7 @@ export function Modal({ open, onClose, title, children, size = 'md', className }
   return (
     <Drawer.Root open={open} onOpenChange={(o) => !o && onClose()} direction="bottom">
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]" />
+        <Drawer.Overlay className="fixed inset-0 z-50 bg-[#0b0b0a]/45 backdrop-blur-[2px]" />
         <Drawer.Content
           className={cn(
             // 移动端：底部抽屉，圆角顶部

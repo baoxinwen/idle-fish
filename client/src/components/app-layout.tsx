@@ -25,7 +25,7 @@ export function AppLayout() {
       {/* 移动端遮罩：抽屉打开时点击关闭 */}
       {drawerOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-30 bg-[#0b0b0a]/45 lg:hidden"
           onClick={() => setDrawerOpen(false)}
         />
       )}
@@ -68,7 +68,7 @@ export function AppLayout() {
                 cn(
                   'group relative flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
                   isActive
-                    ? 'bg-white/5 text-white'
+                    ? 'bg-white/5 text-sidebar-foreground'
                     : 'text-sidebar-foreground/70 hover:bg-white/5 hover:text-sidebar-foreground',
                 )
               }
@@ -88,7 +88,9 @@ export function AppLayout() {
         </nav>
         <div className="border-t border-white/5 p-4">
           <div className="label-mono text-sidebar-foreground/40">铝型材机柜 · 报价工具</div>
-          <div className="font-mono-display mt-1 text-[10px] text-sidebar-foreground/30">v0.1 · local</div>
+          <div className="font-mono-display mt-1 text-[10px] text-sidebar-foreground/30">
+            v0.1 · local
+          </div>
         </div>
       </aside>
 
@@ -112,7 +114,9 @@ export function AppLayout() {
               variant="outline"
               size="sm"
               className="hidden gap-2 text-muted-foreground lg:flex"
-              onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+              onClick={() =>
+                window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))
+              }
             >
               <Search className="h-3.5 w-3.5" />
               搜索

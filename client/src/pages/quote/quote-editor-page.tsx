@@ -27,7 +27,16 @@ export function QuoteEditorPage() {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
   const toast = useToast((s) => s.show);
-  const { input, editingId, editingStatus, initialized, loadFromRecord, reset, markLoading, invalidateEditing } = useQuoteStore();
+  const {
+    input,
+    editingId,
+    editingStatus,
+    initialized,
+    loadFromRecord,
+    reset,
+    markLoading,
+    invalidateEditing,
+  } = useQuoteStore();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [saving, setSaving] = useState(false);
   const [exportQuote, setExportQuote] = useState<QuoteRecord | null>(null);
@@ -179,7 +188,9 @@ export function QuoteEditorPage() {
           <div>
             <h1 className="text-xl font-bold">{editingId ? '编辑报价' : '新建报价'}</h1>
             {editingId && !statusLabel && (
-              <p className="hidden text-xs text-muted-foreground sm:block">修改后保存将更新此报价</p>
+              <p className="hidden text-xs text-muted-foreground sm:block">
+                修改后保存将更新此报价
+              </p>
             )}
             {statusLabel && (
               <p className="text-xs text-destructive">该报价已转为订单，内容只读，不可保存</p>
@@ -187,7 +198,9 @@ export function QuoteEditorPage() {
           </div>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
-          <Button variant="outline" className="shrink-0" onClick={() => navigate('/quotes')}>取消</Button>
+          <Button variant="outline" className="shrink-0" onClick={() => navigate('/quotes')}>
+            取消
+          </Button>
           {editingId && (
             <Button
               variant="outline"
@@ -247,7 +260,11 @@ export function QuoteEditorPage() {
             onClick={() => setMobilePreviewOpen((v) => !v)}
           >
             <span className="label-mono text-xs text-muted-foreground">3D 预览 · 可拖拽旋转</span>
-            {mobilePreviewOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            {mobilePreviewOpen ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
           </button>
           <div
             className={`relative h-[260px] overflow-hidden rounded-lg border bg-[radial-gradient(circle_at_50%_40%,#1E3A5F_0%,#0B1220_100%)] p-2 lg:block lg:h-[340px] ${
@@ -266,7 +283,7 @@ export function QuoteEditorPage() {
             <div className="label-mono pointer-events-none absolute left-3 top-3 z-10 text-[10px] text-accent/80">
               3D 预览 · 可拖拽旋转
             </div>
-            <div className="label-mono pointer-events-none absolute bottom-3 right-3 z-10 rounded bg-black/30 px-2 py-1 text-[10px] text-accent/90 tabular">
+            <div className="label-mono pointer-events-none absolute bottom-3 right-3 z-10 rounded bg-[#0b0b0a]/40 px-2 py-1 text-[10px] text-accent/90 tabular">
               {input.size.width}×{input.size.depth}×{input.size.height}mm
             </div>
             <Cabinet3D size={input.size} color={input.color} />
@@ -275,14 +292,24 @@ export function QuoteEditorPage() {
         </div>
       </div>
 
-      <ExportDialog open={exportQuote !== null} onClose={() => setExportQuote(null)} quote={exportQuote} />
+      <ExportDialog
+        open={exportQuote !== null}
+        onClose={() => setExportQuote(null)}
+        quote={exportQuote}
+      />
 
       {/* 未保存修改导航拦截 */}
-      <Modal open={blocker.state === 'blocked'} onClose={() => blocker.reset?.()} title="有未保存的修改">
+      <Modal
+        open={blocker.state === 'blocked'}
+        onClose={() => blocker.reset?.()}
+        title="有未保存的修改"
+      >
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">离开会丢失当前未保存的修改，确认离开？</p>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => blocker.reset?.()}>继续编辑</Button>
+            <Button variant="outline" onClick={() => blocker.reset?.()}>
+              继续编辑
+            </Button>
             <Button
               variant="destructive"
               onClick={() => {
