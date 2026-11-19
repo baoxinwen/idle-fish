@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Collapse } from '@/components/ui/collapse';
 import { CopyButton } from '@/components/ui/copy-button';
 import { NumberField } from '@/components/number-field';
 import { ordersApi } from '@/lib/api';
@@ -36,7 +37,15 @@ import type { OrderRecord, OrderStatus } from '@idle-fish/shared';
 
 /** 各状态可执行的动作 */
 const ACTIONS: Partial<
-  Record<OrderStatus, { label: string; next: OrderStatus; icon: typeof Factory; variant: 'default' | 'outline' | 'destructive' }[]>
+  Record<
+    OrderStatus,
+    {
+      label: string;
+      next: OrderStatus;
+      icon: typeof Factory;
+      variant: 'default' | 'outline' | 'destructive';
+    }[]
+  >
 > = {
   pending: [{ label: '开始生产', next: 'producing', icon: Factory, variant: 'default' }],
   producing: [{ label: '完成生产', next: 'ready', icon: Factory, variant: 'default' }],
@@ -58,7 +67,12 @@ export function OrderDetailPage() {
   // I-5：加载失败标记——此前失败后 record 为 null 会误显「订单不存在」，且无重试
   const [loadError, setLoadError] = useState(false);
   const [shipOpen, setShipOpen] = useState(false);
-  const [shipForm, setShipForm] = useState({ courier: '', trackingNo: '', actualFreight: 0, checkRemark: '' });
+  const [shipForm, setShipForm] = useState({
+    courier: '',
+    trackingNo: '',
+    actualFreight: 0,
+    checkRemark: '',
+  });
   // 零数量材料默认折叠
   const [showZeroMaterials, setShowZeroMaterials] = useState(false);
 
@@ -90,7 +104,15 @@ export function OrderDetailPage() {
 
   async function handleTransition(next: OrderStatus) {
     if (!id) return;
-    if (next === 'cancelled' && !(await confirmDialog({ message: '确认取消该订单？', confirmLabel: '取消订单', variant: 'destructive' }))) return;
+    if (
+      next === 'cancelled' &&
+      !(await confirmDialog({
+        message: '确认取消该订单？',
+        confirmLabel: '取消订单',
+        variant: 'destructive',
+      }))
+    )
+      return;
     try {
       await ordersApi.setStatus(id, next);
       toast(`状态已更新：${ORDER_STATUS_LABEL[next]}`);
@@ -139,7 +161,8 @@ export function OrderDetailPage() {
   if (!id || !record) return <EmptyState text="订单不存在" />;
 
   const actions = ACTIONS[record.status] ?? [];
-  const canEdit = record.status === 'pending' || record.status === 'producing' || record.status === 'ready';
+  const canEdit =
+    record.status === 'pending' || record.status === 'producing' || record.status === 'ready';
   const currentStep = FLOW.indexOf(record.status);
   // M-15：与服务端状态机对齐（shipped 只允许 done）——此前 shipped 仍显示「取消订单」，
   // 点击必被服务端 400 拒绝
@@ -178,7 +201,11 @@ export function OrderDetailPage() {
           </div>
         </div>
         {canEdit && (
-          <Button variant="outline" className="shrink-0" onClick={() => navigate(`/orders/${record.id}/edit`)}>
+          <Button
+            variant="outline"
+            className="shrink-0"
+            onClick={() => navigate(`/orders/${record.id}/edit`)}
+          >
             <Pencil className="h-4 w-4" />
             编辑
           </Button>
@@ -206,19 +233,30 @@ export function OrderDetailPage() {
                         <div
                           className={cn(
                             'flex h-7 w-7 items-center justify-center rounded-full text-xs font-medium transition-colors',
-                            active && 'bg-accent text-accent-foreground ring-2 ring-accent/30 ring-offset-2 ring-offset-card',
+                            active &&
+                              'bg-accent text-accent-foreground ring-2 ring-accent/30 ring-offset-2 ring-offset-card',
                             done && 'bg-accent/20 text-accent',
                             !active && !done && 'bg-secondary text-muted-foreground',
                           )}
                         >
                           {done ? <CheckCircle2 className="h-4 w-4" /> : i + 1}
                         </div>
-                        <span className={cn('text-[10px] whitespace-nowrap', active ? 'font-medium text-foreground' : 'text-muted-foreground')}>
+                        <span
+                          className={cn(
+                            'text-[10px] whitespace-nowrap',
+                            active ? 'font-medium text-foreground' : 'text-muted-foreground',
+                          )}
+                        >
                           {ORDER_STATUS_LABEL[s]}
                         </span>
                       </div>
                       {i < FLOW.length - 1 && (
-                        <div className={cn('mx-1 h-0.5 flex-1 rounded', i < currentStep ? 'bg-accent' : 'bg-secondary')} />
+                        <div
+                          className={cn(
+                            'mx-1 h-0.5 flex-1 rounded',
+                            i < currentStep ? 'bg-accent' : 'bg-secondary',
+                          )}
+                        />
                       )}
                     </div>
                   );
@@ -231,14 +269,17 @@ export function OrderDetailPage() {
                 </div>
                 <div className="min-w-0">
                   <div className="text-sm font-medium">{ORDER_STATUS_LABEL[record.status]}</div>
-                  <div className="text-xs text-muted-foreground">第 {currentStep + 1}/{FLOW.length} 步 · {ORDER_STATUS_LABEL[FLOW[currentStep + 1] ?? FLOW[currentStep]]}</div>
+                  <div className="text-xs text-muted-foreground">
+                    第 {currentStep + 1}/{FLOW.length} 步 ·{' '}
+                    {ORDER_STATUS_LABEL[FLOW[currentStep + 1] ?? FLOW[currentStep]]}
+                  </div>
                 </div>
+                <div className="ml-auto h-1.5 w-24 overflow-hidden rounded-full bg-secondary">
                   {/* scaleX 而非 width：布局属性动画在弱设备上会抖 */}
                   <div
                     className="h-full w-full origin-left rounded-full bg-accent transition-transform"
                     style={{ transform: `scaleX(${((currentStep + 1) / FLOW.length) * 100}%)` }}
                   />
-                </div>
                 </div>
               </div>
             </>
@@ -278,7 +319,11 @@ export function OrderDetailPage() {
       <div className="grid gap-3 lg:grid-cols-2">
         {/* 客户与收货 */}
         <Card>
-          <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">客户与收货</CardTitle></CardHeader>
+          <CardHeader className="pb-3">
+            <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">
+              客户与收货
+            </CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <InfoRow label="客户名称" value={record.customer.name} />
             <InfoRow label="平台订单号" value={record.customer.platformOrderNo || '—'} />
@@ -290,7 +335,11 @@ export function OrderDetailPage() {
 
         {/* 机柜与材料 */}
         <Card>
-          <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">机柜与材料</CardTitle></CardHeader>
+          <CardHeader className="pb-3">
+            <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">
+              机柜与材料
+            </CardTitle>
+          </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <InfoRow
               label="尺寸"
@@ -312,16 +361,21 @@ export function OrderDetailPage() {
                         onClick={() => setShowZeroMaterials((v) => !v)}
                         className="flex w-full items-center gap-1 rounded py-0.5 text-xs text-muted-foreground hover:text-foreground"
                       >
-                        {showZeroMaterials ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                        {showZeroMaterials ? (
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        ) : (
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        )}
                         未选用配件 {zeroMaterials.length} 项（数量为 0）
                       </button>
-                      {showZeroMaterials && (
+                      {/* 铁律7：Grid 折叠动画，替代条件渲染硬切 */}
+                      <Collapse open={showZeroMaterials}>
                         <div className="space-y-1 opacity-60">
                           {zeroMaterials.map((m, i) => (
                             <MaterialLine key={`z-${i}`} m={m} />
                           ))}
                         </div>
-                      )}
+                      </Collapse>
                     </>
                   )}
                 </div>
@@ -354,7 +408,9 @@ export function OrderDetailPage() {
                   bold
                 />
                 <CompareRow label="预估毛利率" estimated={`${fin.estimatedProfitRatePct}%`} />
-                <p className="mt-2 text-xs text-muted-foreground">未发货——确认发货并填写实际运费后，将在此展示实际成本、利润与差异。</p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  未发货——确认发货并填写实际运费后，将在此展示实际成本、利润与差异。
+                </p>
               </>
             ) : (
               <>
@@ -384,7 +440,11 @@ export function OrderDetailPage() {
                   estimated={formatMoney(fin.estimatedProfit)}
                   actual={formatMoney(ship.actualProfit)}
                   diff={ship.actualProfit - fin.estimatedProfit}
-                  valueClassOverride={{ estimated: undefined, actual: profitColor(ship.actualProfit), diff: profitColor(ship.actualProfit - fin.estimatedProfit) }}
+                  valueClassOverride={{
+                    estimated: undefined,
+                    actual: profitColor(ship.actualProfit),
+                    diff: profitColor(ship.actualProfit - fin.estimatedProfit),
+                  }}
                   bold
                 />
                 <CompareRow
@@ -423,7 +483,11 @@ export function OrderDetailPage() {
 
       {record.remark && (
         <Card>
-          <CardHeader className="pb-3"><CardTitle className="label-mono text-xs font-semibold text-muted-foreground">备注</CardTitle></CardHeader>
+          <CardHeader className="pb-3">
+            <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">
+              备注
+            </CardTitle>
+          </CardHeader>
           <CardContent className="text-sm text-muted-foreground">{record.remark}</CardContent>
         </Card>
       )}
@@ -464,7 +528,9 @@ export function OrderDetailPage() {
             />
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setShipOpen(false)}>取消</Button>
+            <Button variant="outline" onClick={() => setShipOpen(false)}>
+              取消
+            </Button>
             <Button variant="accent" onClick={handleShip}>
               <Truck className="h-4 w-4" />
               确认发货
@@ -476,11 +542,16 @@ export function OrderDetailPage() {
   );
 }
 
-function MaterialLine({ m }: { m: { category: keyof typeof CATEGORY_LABEL; name: string; quantity: number; unitPrice: number } }) {
+function MaterialLine({
+  m,
+}: {
+  m: { category: keyof typeof CATEGORY_LABEL; name: string; quantity: number; unitPrice: number };
+}) {
   return (
     <div className="flex justify-between tabular">
       <span>
-        <span className="text-xs text-muted-foreground">[{CATEGORY_LABEL[m.category]}]</span> {m.name}
+        <span className="text-xs text-muted-foreground">[{CATEGORY_LABEL[m.category]}]</span>{' '}
+        {m.name}
       </span>
       <span className="text-muted-foreground">
         {m.quantity} × {formatMoney(m.unitPrice)}
@@ -533,7 +604,12 @@ function CompareRow({
     const good = inverseDiff ? diff <= 0 : diff >= 0;
     const sign = diff > 0 ? '+' : '';
     diffNode = (
-      <span className={cn('tabular', good ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive')}>
+      <span
+        className={cn(
+          'tabular',
+          good ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive',
+        )}
+      >
         {isPercent ? `${sign}${diff}pp` : `${sign}${formatMoney(diff)}`}
       </span>
     );
@@ -542,9 +618,28 @@ function CompareRow({
   }
   return (
     <div className="grid grid-cols-[minmax(0,1fr)_88px_88px_72px] items-center gap-2 border-b border-border/50 py-1.5 text-sm last:border-0 sm:grid-cols-[minmax(0,1fr)_110px_110px_90px]">
-      <span className={cn('text-muted-foreground', bold && 'font-medium text-foreground')}>{label}</span>
-      <span className={cn('text-right tabular', weight, valueClass ?? '', valueClassOverride?.estimated)}>{estimated}</span>
-      <span className={cn('text-right tabular', weight, actual == null ? 'text-muted-foreground/40' : '', valueClass ?? '', valueClassOverride?.actual)}>
+      <span className={cn('text-muted-foreground', bold && 'font-medium text-foreground')}>
+        {label}
+      </span>
+      <span
+        className={cn(
+          'text-right tabular',
+          weight,
+          valueClass ?? '',
+          valueClassOverride?.estimated,
+        )}
+      >
+        {estimated}
+      </span>
+      <span
+        className={cn(
+          'text-right tabular',
+          weight,
+          actual == null ? 'text-muted-foreground/40' : '',
+          valueClass ?? '',
+          valueClassOverride?.actual,
+        )}
+      >
         {actual == null ? '—' : actual}
       </span>
       <span className="text-right text-xs">{diffNode}</span>
