@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Package, ChevronRight, Factory, CheckCircle2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +17,7 @@ import { useToast } from '@/components/toaster';
 import { confirmDialog } from '@/components/confirm-dialog';
 import { LoadingState, EmptyState } from '@/components/states';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_BADGE } from '@/lib/status';
+import { usePageTitle } from '@/lib/use-page-title';
 import { formatMoney, formatShortDateTime, profitColor, cn } from '@/lib/utils';
 import type { OrderRecord, OrderStatus } from '@idle-fish/shared';
 
@@ -31,6 +32,7 @@ const FILTERS: { key: 'all' | OrderStatus; label: string }[] = [
 ];
 
 export function OrderListPage() {
+  usePageTitle('订单管理');
   const navigate = useNavigate();
   const toast = useToast((s) => s.show);
   const [records, setRecords] = useState<OrderRecord[]>([]);
@@ -87,7 +89,16 @@ export function OrderListPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!(await confirmDialog({ message: '确认删除该订单？', confirmLabel: '删除', variant: 'destructive' }))) return;
+    const target = records.find((r) => r.id === id);
+    if (
+      !(await confirmDialog({
+        title: '删除订单',
+        message: `订单 ${target?.orderNo ?? ''} 将被删除，删除后不可恢复。`,
+        confirmLabel: '删除订单',
+        variant: 'destructive',
+      }))
+    )
+      return;
     try {
       await ordersApi.remove(id);
       toast('已删除');
@@ -125,7 +136,13 @@ export function OrderListPage() {
       ) : visible.length === 0 ? (
         <Card className="border-dashed">
           {query ? (
-            <EmptyState icon={Package} text={`没有匹配「${query}」的订单`} hint="换个关键词试试，或清空搜索查看全部" />
+            <EmptyState
+              icon={Package}
+              text={`没有匹配「${query}」的订单`}
+              hint="换个关键词试试，或清空搜索查看全部"
+              actionLabel="清空搜索"
+              onAction={() => setQuery('')}
+            />
           ) : (
             <EmptyState
               icon={Package}
@@ -166,10 +183,14 @@ export function OrderListPage() {
                       onClick={() => navigate(`/orders/${r.id}`)}
                     >
                       <td className="px-4 py-3 font-mono-display text-[13px] font-semibold">
-                        <span className="inline-flex items-center gap-1">
+                        {/* 键盘路径：编号即真实链接（可 Tab/Enter/中键），整行 onClick 仅为指针增强 */}
+                        <Link
+                          to={`/orders/${r.id}`}
+                          className="inline-flex items-center gap-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+                        >
                           {r.orderNo}
                           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover/row:opacity-100" />
-                        </span>
+                        </Link>
                       </td>
                       <td className="max-w-40 truncate px-4 py-3 text-muted-foreground">{r.customer.name || '—'}</td>
                       <td className="px-4 py-3 font-mono-display text-muted-foreground">
@@ -183,7 +204,7 @@ export function OrderListPage() {
                           title={actual ? '实际利润（含发货运费）' : '预估利润（按预估成本计算）'}
                           className="inline-flex items-center justify-end gap-1"
                         >
-                          {!actual && <span className="text-[10px] font-normal text-muted-foreground/70">预</span>}
+                          {!actual && <span className="text-[10px] font-normal text-muted-foreground">预</span>}
                           {formatMoney(profit)}
                         </span>
                       </td>
@@ -198,13 +219,25 @@ export function OrderListPage() {
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-1">
                           {r.status === 'pending' && (
-                            <Button variant="ghost" size="icon" title="开始生产" onClick={() => quickTransition(r, 'producing')}>
-                              <Factory className="h-4 w-4 text-accent" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="开始生产"
+                              aria-label={`开始生产 ${r.orderNo}`}
+                              onClick={() => quickTransition(r, 'producing')}
+                            >
+                              <Factory className="h-4 w-4 text-accent-strong" />
                             </Button>
                           )}
                           {r.status === 'shipped' && (
-                            <Button variant="ghost" size="icon" title="确认签收" onClick={() => quickTransition(r, 'done')}>
-                              <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="确认签收"
+                              aria-label={`确认签收 ${r.orderNo}`}
+                              onClick={() => quickTransition(r, 'done')}
+                            >
+                              <CheckCircle2 className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />
                             </Button>
                           )}
                           <Button
@@ -212,6 +245,7 @@ export function OrderListPage() {
                             size="icon"
                             className="text-muted-foreground hover:text-destructive"
                             title="删除"
+                            aria-label={`删除 ${r.orderNo}`}
                             onClick={() => handleDelete(r.id)}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -231,24 +265,26 @@ export function OrderListPage() {
               const actual = r.status === 'shipped' || r.status === 'done';
               const profit = r.shipping?.actualProfit ?? r.finance.estimatedProfit;
               return (
-                <Card
-                  key={r.id}
-                  className="card-hover cursor-pointer p-3"
-                  onClick={() => navigate(`/orders/${r.id}`)}
-                >
-                  <div className="flex items-center justify-between">
+                <Card key={r.id} className="card-hover relative p-3">
+                  {/* 整卡可点由覆盖层 Link 承担（键盘可达），行内按钮位于其上层不受影响 */}
+                  <Link
+                    to={`/orders/${r.id}`}
+                    aria-label={`查看订单 ${r.orderNo}`}
+                    className="absolute inset-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+                  />
+                  <div className="relative flex items-center justify-between">
                     <span className="font-mono-display text-[13px] font-semibold">{r.orderNo}</span>
                     <Badge variant={ORDER_STATUS_BADGE[r.status]} className="text-[10px]">
                       {ORDER_STATUS_LABEL[r.status]}
                     </Badge>
                   </div>
-                  <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
+                  <div className="relative mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
                     <span className="truncate">{r.customer.name || '—'}</span>
                     <span className="ml-2 shrink-0 font-mono-display">
                       {r.size.width}×{r.size.depth}×{r.size.height}
                     </span>
                   </div>
-                  <div className="mt-2 flex items-end justify-between">
+                  <div className="relative mt-2 flex items-end justify-between">
                     <div>
                       <div className="font-mono-display text-base font-bold">{formatMoney(r.finance.actualPrice)}</div>
                       <div className={cn('text-xs font-medium tabular', profitColor(profit))}>
@@ -262,10 +298,7 @@ export function OrderListPage() {
                           variant="outline"
                           size="sm"
                           className="h-7 text-xs"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            quickTransition(r, 'done');
-                          }}
+                          onClick={() => quickTransition(r, 'done')}
                         >
                           签收
                         </Button>

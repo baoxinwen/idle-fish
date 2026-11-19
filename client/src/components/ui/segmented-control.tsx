@@ -1,3 +1,4 @@
+import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface SegmentedOption<T extends string> {
@@ -23,10 +24,22 @@ export function SegmentedControl<T extends string>({
   className,
   ariaLabel,
 }: SegmentedControlProps<T>) {
+  // APG radio 模式：roving tabindex（选中项 0、其余 -1）+ 方向键移动选中
+  function handleKeyDown(e: ReactKeyboardEvent<HTMLDivElement>) {
+    const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+    if (!keys.includes(e.key)) return;
+    e.preventDefault();
+    const idx = options.findIndex((o) => o.value === value);
+    const delta = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1;
+    const next = options[(idx + delta + options.length) % options.length];
+    onChange(next.value);
+  }
+
   return (
     <div
       role="radiogroup"
       aria-label={ariaLabel}
+      onKeyDown={handleKeyDown}
       className={cn('grid gap-1 rounded-md bg-secondary/70 p-1', className)}
       style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}
     >
@@ -38,6 +51,7 @@ export function SegmentedControl<T extends string>({
             type="button"
             role="radio"
             aria-checked={active}
+            tabIndex={active ? 0 : -1}
             onClick={() => onChange(o.value)}
             className={cn(
               'flex h-8 items-center justify-center gap-2 rounded-[5px] px-3 text-sm font-medium transition-[color,background-color,box-shadow]',

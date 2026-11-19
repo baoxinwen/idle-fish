@@ -5,7 +5,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Download, Trash2, FileText, ChevronRight, FilePlus } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,7 @@ import { LoadingState, EmptyState } from '@/components/states';
 import { ExportDialog } from '@/components/export/export-dialog';
 import { ConvertQuoteDialog, useConvertQuote } from '@/components/quote-form/convert-dialog';
 import { QUOTE_STATUS_LABEL, QUOTE_STATUS_BADGE, COLOR_LABEL } from '@/lib/status';
+import { usePageTitle } from '@/lib/use-page-title';
 import { cn, formatMoney, formatShortDateTime } from '@/lib/utils';
 import type { QuoteRecord, QuoteStatus } from '@idle-fish/shared';
 
@@ -29,6 +30,7 @@ const FILTERS: { key: 'all' | QuoteStatus; label: string }[] = [
 ];
 
 export function QuoteListPage() {
+  usePageTitle('报价管理');
   const navigate = useNavigate();
   const toast = useToast((s) => s.show);
   const [records, setRecords] = useState<QuoteRecord[]>([]);
@@ -81,7 +83,16 @@ export function QuoteListPage() {
   }, [visible]);
 
   async function handleDelete(id: string) {
-    if (!(await confirmDialog({ message: '确认删除该报价？', confirmLabel: '删除', variant: 'destructive' }))) return;
+    const target = records.find((r) => r.id === id);
+    if (
+      !(await confirmDialog({
+        title: '删除报价',
+        message: `报价 ${target?.quoteNo ?? ''} 将被删除，删除后不可恢复。`,
+        confirmLabel: '删除报价',
+        variant: 'destructive',
+      }))
+    )
+      return;
     try {
       await quotesApi.remove(id);
       toast('已删除');
@@ -118,7 +129,7 @@ export function QuoteListPage() {
           </span>
           <span className="text-sm text-muted-foreground">
             合计{' '}
-            <span className="font-mono-display text-sm font-semibold text-accent">
+            <span className="font-mono-display text-sm font-semibold text-accent-strong">
               {formatMoney(summary.total)}
             </span>
           </span>
@@ -142,7 +153,13 @@ export function QuoteListPage() {
       ) : visible.length === 0 ? (
         <Card className="border-dashed">
           {query ? (
-            <EmptyState icon={FileText} text={`没有匹配「${query}」的报价`} hint="换个关键词试试，或清空搜索查看全部" />
+            <EmptyState
+              icon={FileText}
+              text={`没有匹配「${query}」的报价`}
+              hint="换个关键词试试，或清空搜索查看全部"
+              actionLabel="清空搜索"
+              onAction={() => setQuery('')}
+            />
           ) : (
             <EmptyState
               icon={FileText}
@@ -177,10 +194,14 @@ export function QuoteListPage() {
                     onClick={() => navigate(`/quotes/${r.id}`)}
                   >
                     <td className="px-4 py-3 font-mono-display text-[13px] font-semibold">
-                      <span className="inline-flex items-center gap-1">
+                      {/* 键盘路径：编号即真实链接（可 Tab/Enter/中键），整行 onClick 仅为指针增强 */}
+                      <Link
+                        to={`/quotes/${r.id}`}
+                        className="inline-flex items-center gap-1 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+                      >
                         {r.quoteNo}
                         <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover/row:opacity-100" />
-                      </span>
+                      </Link>
                     </td>
                     <td className="px-4 py-3 font-mono-display text-muted-foreground">
                       {r.input.size.width}×{r.input.size.depth}×{r.input.size.height}
@@ -204,11 +225,18 @@ export function QuoteListPage() {
                           size="icon"
                           disabled={r.status === 'converted'}
                           title={r.status === 'converted' ? '已转为订单' : '转为订单'}
+                          aria-label={`转为订单 ${r.quoteNo}`}
                           onClick={() => convert.start(r)}
                         >
-                          <FilePlus className={cn('h-4 w-4', r.status !== 'converted' && 'text-accent')} />
+                          <FilePlus className={cn('h-4 w-4', r.status !== 'converted' && 'text-accent-strong')} />
                         </Button>
-                        <Button variant="ghost" size="icon" title="导出" onClick={() => setExportQuote(r)}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="导出"
+                          aria-label={`导出 ${r.quoteNo}`}
+                          onClick={() => setExportQuote(r)}
+                        >
                           <Download className="h-4 w-4" />
                         </Button>
                         <Button
@@ -217,6 +245,7 @@ export function QuoteListPage() {
                           className={cn('text-muted-foreground hover:text-destructive', r.status === 'converted' && 'opacity-40')}
                           disabled={r.status === 'converted'}
                           title="删除"
+                          aria-label={`删除 ${r.quoteNo}`}
                           onClick={() => handleDelete(r.id)}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -229,27 +258,28 @@ export function QuoteListPage() {
             </table>
           </Card>
 
-          {/* 移动端：卡片列表 */}
+          {/* 移动端：卡片列表。整卡可点由覆盖层 Link 承担（键盘可达），行内按钮位于其上层不受影响 */}
           <div className="space-y-2 lg:hidden">
             {visible.map((r) => (
-              <Card
-                key={r.id}
-                className="card-hover cursor-pointer p-3"
-                onClick={() => navigate(`/quotes/${r.id}`)}
-              >
-                <div className="flex items-center justify-between">
+              <Card key={r.id} className="card-hover relative p-3">
+                <Link
+                  to={`/quotes/${r.id}`}
+                  aria-label={`查看报价 ${r.quoteNo}`}
+                  className="absolute inset-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+                />
+                <div className="relative flex items-center justify-between">
                   <span className="font-mono-display text-[13px] font-semibold">{r.quoteNo}</span>
                   <Badge variant={QUOTE_STATUS_BADGE[r.status]} className="text-[10px]">
                     {QUOTE_STATUS_LABEL[r.status]}
                   </Badge>
                 </div>
-                <div className="mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
+                <div className="relative mt-1.5 flex items-center justify-between text-xs text-muted-foreground">
                   <span>{COLOR_LABEL[r.input.color]}</span>
                   <span className="font-mono-display">
                     {r.input.size.width}×{r.input.size.depth}×{r.input.size.height}
                   </span>
                 </div>
-                <div className="mt-2 flex items-end justify-between">
+                <div className="relative mt-2 flex items-end justify-between">
                   <div className="font-mono-display text-base font-bold">{formatMoney(r.result.finalPrice)}</div>
                   <div className="flex items-center gap-0.5">
                     <Button
@@ -258,22 +288,18 @@ export function QuoteListPage() {
                       className="h-7 w-7"
                       disabled={r.status === 'converted'}
                       title={r.status === 'converted' ? '已转为订单' : '转为订单'}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        convert.start(r);
-                      }}
+                      aria-label={`转为订单 ${r.quoteNo}`}
+                      onClick={() => convert.start(r)}
                     >
-                      <FilePlus className="h-3.5 w-3.5 text-accent" />
+                      <FilePlus className="h-3.5 w-3.5 text-accent-strong" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7"
                       title="导出"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setExportQuote(r);
-                      }}
+                      aria-label={`导出 ${r.quoteNo}`}
+                      onClick={() => setExportQuote(r)}
                     >
                       <Download className="h-3.5 w-3.5" />
                     </Button>
