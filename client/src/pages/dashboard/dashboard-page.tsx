@@ -45,14 +45,15 @@ const CHART = {
   slate: '#64748B', // 石板灰 - 辅助
 };
 
-// 状态色板：从主题派生，降低饱和度；shipped 用更深的青色与墨蓝拉开距离
+// 状态色板：与 lib/status.ts 的徽章变体一一对应（secondary/accent/warning/default/success/
+// destructive），同一状态在徽章、图例、环形图里是同一种颜色。中明度色值保证亮暗主题可读。
 const STATUS_COLORS: Record<string, string> = {
-  pending: '#64748B', // 石板灰
-  producing: '#1E3A5F', // 墨蓝
-  ready: '#C9A961', // 暖金
-  shipped: '#0E7490', // 深青
-  done: '#15803D', // 墨绿
-  cancelled: '#B91C1C', // 暗红
+  pending: '#78716C', // 暖灰 - secondary
+  producing: '#C9A961', // 品牌金 - accent
+  ready: '#D97706', // amber-600 - warning
+  shipped: '#3E5C7A', // 墨蓝 - default(primary)
+  done: '#059669', // emerald-600 - success
+  cancelled: '#B91C1C', // red-700 - destructive
 };
 
 const AXIS_TICK = { fontSize: 11, fill: 'hsl(var(--muted-foreground))' };
