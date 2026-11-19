@@ -16,21 +16,25 @@ export function ChangePasswordSection() {
   const [newPassword, setNewPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [saving, setSaving] = useState(false);
+  // 校验错误落在对应字段旁（toast 够不着出错位置）：new 挂新密码、confirm 挂确认框
+  const [fieldErrors, setFieldErrors] = useState<{ new?: string; confirm?: string }>({});
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const errors: { new?: string; confirm?: string } = {};
     if (newPassword.length < 8) {
-      toast('新密码至少 8 位');
-      return;
+      errors.new = '请使用至少 8 个字符';
     }
     if (newPassword !== confirm) {
-      toast('两次输入的新密码不一致');
+      errors.confirm = '两次输入的新密码不一致，请重新输入';
+    } else if (newPassword.length >= 8 && newPassword === oldPassword) {
+      errors.new = '新密码不能与旧密码相同';
+    }
+    if (errors.new || errors.confirm) {
+      setFieldErrors(errors);
       return;
     }
-    if (newPassword === oldPassword) {
-      toast('新密码不能与旧密码相同');
-      return;
-    }
+    setFieldErrors({});
     setSaving(true);
     try {
       await authApi.changePassword({ oldPassword, newPassword });
@@ -55,8 +59,9 @@ export function ChangePasswordSection() {
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
-              <Label>旧密码</Label>
+              <Label htmlFor="pw-old">旧密码</Label>
               <Input
+                id="pw-old"
                 type="password"
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
@@ -64,23 +69,45 @@ export function ChangePasswordSection() {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>新密码</Label>
+              <Label htmlFor="pw-new">新密码</Label>
               <Input
+                id="pw-new"
                 type="password"
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                onChange={(e) => {
+                  setNewPassword(e.target.value);
+                  if (fieldErrors.new) setFieldErrors((x) => ({ ...x, new: undefined }));
+                }}
                 autoComplete="new-password"
                 placeholder="至少 8 位"
+                aria-invalid={fieldErrors.new ? true : undefined}
+                aria-describedby={fieldErrors.new ? 'pw-new-error' : undefined}
               />
+              {fieldErrors.new && (
+                <p id="pw-new-error" className="text-xs text-destructive">
+                  {fieldErrors.new}
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
-              <Label>确认新密码</Label>
+              <Label htmlFor="pw-confirm">确认新密码</Label>
               <Input
+                id="pw-confirm"
                 type="password"
                 value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
+                onChange={(e) => {
+                  setConfirm(e.target.value);
+                  if (fieldErrors.confirm) setFieldErrors((x) => ({ ...x, confirm: undefined }));
+                }}
                 autoComplete="new-password"
+                aria-invalid={fieldErrors.confirm ? true : undefined}
+                aria-describedby={fieldErrors.confirm ? 'pw-confirm-error' : undefined}
               />
+              {fieldErrors.confirm && (
+                <p id="pw-confirm-error" className="text-xs text-destructive">
+                  {fieldErrors.confirm}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex justify-end">

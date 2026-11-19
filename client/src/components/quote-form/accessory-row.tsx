@@ -5,7 +5,7 @@
  * 移动端：名称整行，数量/单价/小计/删除同行；两套布局均为受控绑定同一 item。
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { formatMoney } from '@/lib/utils';
@@ -136,10 +136,17 @@ function NumCell({
   useEffect(() => {
     if (!focused.current) setText(String(value));
   }, [value]);
+  // 可见 label 的无障碍关联（compact 模式无可见 label，直接 aria-label）
+  const autoId = useId();
   return (
     <div>
-      {!compact && <label className="mb-1 block text-xs text-muted-foreground">{label}</label>}
+      {!compact && (
+        <label htmlFor={autoId} className="mb-1 block text-xs text-muted-foreground">
+          {label}
+        </label>
+      )}
       <input
+        id={compact ? undefined : autoId}
         type="number"
         min={0}
         step={decimal ? 0.01 : 1}
@@ -162,7 +169,7 @@ function NumCell({
           if (n !== null) onChange(n);
         }}
         aria-label={compact ? label : undefined}
-        className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular focus-interlock"
+        className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-base sm:text-sm tabular focus-interlock"
       />
     </div>
   );
@@ -195,7 +202,7 @@ function RemoveCell({
       onClick={onRemove}
       title="删除"
       aria-label="删除"
-      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${alignRight ? 'justify-self-end' : ''}`}
+      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong ${alignRight ? 'justify-self-end' : ''}`}
     >
       <Trash2 className="h-3.5 w-3.5" />
     </button>

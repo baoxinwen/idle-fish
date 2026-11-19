@@ -136,8 +136,9 @@ export function ConvertQuoteDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <Label>平台订单号</Label>
+            <Label htmlFor="convert-platform-no">平台订单号</Label>
             <Input
+              id="convert-platform-no"
               value={form.customer.platformOrderNo}
               onChange={(e) =>
                 setForm((f0) => ({ ...f0, customer: { ...f0.customer, platformOrderNo: e.target.value } }))
@@ -147,8 +148,9 @@ export function ConvertQuoteDialog({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>收件人</Label>
+              <Label htmlFor="convert-receiver">收件人</Label>
               <Input
+                id="convert-receiver"
                 value={form.shippingAddress.receiver}
                 onChange={(e) =>
                   setForm((f0) => ({
@@ -160,8 +162,11 @@ export function ConvertQuoteDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label>电话</Label>
+              <Label htmlFor="convert-phone">电话</Label>
               <Input
+                id="convert-phone"
+                type="tel"
+                inputMode="tel"
                 value={form.shippingAddress.phone}
                 onChange={(e) =>
                   setForm((f0) => ({
@@ -174,8 +179,9 @@ export function ConvertQuoteDialog({
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>收货地址</Label>
+            <Label htmlFor="convert-address">收货地址</Label>
             <Input
+              id="convert-address"
               value={form.shippingAddress.address}
               onChange={(e) =>
                 setForm((f0) => ({
@@ -187,8 +193,9 @@ export function ConvertQuoteDialog({
             />
           </div>
           <div className="space-y-1.5">
-            <Label>备注</Label>
+            <Label htmlFor="convert-remark">备注</Label>
             <Input
+              id="convert-remark"
               value={form.remark}
               onChange={(e) => setForm((f0) => ({ ...f0, remark: e.target.value }))}
               placeholder="选填"

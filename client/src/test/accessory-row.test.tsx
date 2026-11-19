@@ -13,12 +13,15 @@ import type { AccessoryItem } from '@idle-fish/shared';
 
 const item: AccessoryItem = { name: '合页', category: 'custom', quantity: 2, unitPrice: 3 };
 
-/** 桌面网格与移动端各渲染一份输入，取桌面区（aria-label 版） */
+/**
+ * 桌面网格与移动端各渲染一份输入，两份的可访问名现已同时可达
+ * （移动端 label 已用 htmlFor 关联、桌面端 aria-label），行为同源，取任一即可。
+ */
 function getPriceInput() {
-  return screen.getByLabelText('单价');
+  return screen.getAllByLabelText('单价')[0];
 }
 function getQuantityInput() {
-  return screen.getByLabelText('数量');
+  return screen.getAllByLabelText('数量')[0];
 }
 
 describe('AccessoryRow NumCell（C-2）', () => {

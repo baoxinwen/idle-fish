@@ -13,13 +13,18 @@ interface WastageFieldProps {
   className?: string;
   /** 内部输入框后缀，默认 %；表格行内传 "" 由外部单位列显示 */
   suffix?: string;
+  /** 透传 NumberField：外部 label 关联 / 无可见标签的无障碍名 */
+  id?: string;
+  ariaLabel?: string;
 }
 
-export function WastageField({ label, value, onChange, className, suffix = '%' }: WastageFieldProps) {
+export function WastageField({ label, value, onChange, className, suffix = '%', id, ariaLabel }: WastageFieldProps) {
   const pct = Math.round((value - 1) * 1000) / 10; // 1.05 → 5
   return (
     <NumberField
       label={label}
+      id={id}
+      ariaLabel={ariaLabel}
       className={className}
       value={pct}
       min={0}

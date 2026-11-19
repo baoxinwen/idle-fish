@@ -3,6 +3,7 @@
  * 设置页 / 报价页共用。
  */
 
+import { useId } from 'react';
 import { NumberField } from './number-field';
 import { ProfitRateField } from './profit-rate-field';
 import { WastageField } from './wastage-field';
@@ -24,16 +25,21 @@ interface ParamRowProps {
 }
 
 export function ParamRow({ label, unit, value, onChange, emptyValue, displayDecimals, percent, wastage, unclamped }: ParamRowProps) {
+  // 行标签是可见 <label>，经 htmlFor 关联到行内输入框（无障碍名由此而来）
+  const fieldId = useId();
   return (
     <div className="flex items-center gap-3 border-b border-border/60 py-2 last:border-0">
-      <span className="w-24 shrink-0 text-sm text-muted-foreground sm:w-28">{label}</span>
+      <label htmlFor={fieldId} className="w-24 shrink-0 text-sm text-muted-foreground sm:w-28">
+        {label}
+      </label>
       {/* min-w 兜底：挤压时输入框保持可见可点，不可塌缩成竖条（宁可轻微溢出） */}
       {percent ? (
-        <ProfitRateField label="" suffix="" value={value} onChange={onChange} className="min-w-16 flex-1" />
+        <ProfitRateField id={fieldId} label="" suffix="" value={value} onChange={onChange} className="min-w-16 flex-1" />
       ) : wastage ? (
-        <WastageField label="" suffix="" value={value} onChange={onChange} className="min-w-16 flex-1" />
+        <WastageField id={fieldId} label="" suffix="" value={value} onChange={onChange} className="min-w-16 flex-1" />
       ) : (
         <NumberField
+          id={fieldId}
           label=""
           value={value}
           onChange={onChange}

@@ -13,6 +13,10 @@ interface NumberFieldProps {
   step?: number;
   suffix?: string;
   className?: string;
+  /** 外部指定 input id：调用方想用自己的 <label htmlFor> 关联时传（如 ParamRow 行标签） */
+  id?: string;
+  /** 无可见标签时的无障碍名（如 FeeToggleRow 行内「运费金额」） */
+  ariaLabel?: string;
   /** 辅助说明（input 下方） */
   helper?: string;
   /** 错误信息（input 下方，红色） */
@@ -42,6 +46,8 @@ export function NumberField({
   step = 1,
   suffix,
   className,
+  id: idProp,
+  ariaLabel,
   helper,
   error,
   emptyValue = 0,
@@ -51,6 +57,10 @@ export function NumberField({
   const [focused, setFocused] = React.useState(false);
   const [text, setText] = React.useState(() => formatValue(value, displayDecimals));
   const inputRef = React.useRef<HTMLInputElement>(null);
+  // 无障碍名三通道：外部 id（调用方自己的 label htmlFor）> ariaLabel > 内置 Label htmlFor
+  const autoId = React.useId();
+  const inputId = idProp ?? autoId;
+  const descId = helper || error ? `${inputId}-desc` : undefined;
 
   // 外部值变化（实时计价联动、加载记录）时同步显示；正在输入时不打断
   React.useEffect(() => {
@@ -81,12 +91,18 @@ export function NumberField({
 
   return (
     <div className={cn('space-y-1.5', className)}>
-      {label && <Label className="label-mono text-muted-foreground">{label}</Label>}
+      {label && (
+        <Label htmlFor={inputId} className="label-mono text-muted-foreground">
+          {label}
+        </Label>
+      )}
       <div className="flex items-center gap-2">
         <Input
           ref={inputRef}
+          id={inputId}
           type="number"
           inputMode="decimal"
+          aria-label={!label ? ariaLabel : undefined}
           {...(unclamped ? {} : { min, max })}
           step={step}
           value={text}
@@ -107,7 +123,8 @@ export function NumberField({
             // I-4：空串/非法中间态不实时提交（避免把 0 推进计价 store），失焦统一收口
             if (parseNumberInput(e.target.value) !== null) commit(e.target.value);
           }}
-          aria-invalid={!!error}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={descId}
           className="tabular"
         />
         {suffix && (
@@ -115,9 +132,13 @@ export function NumberField({
         )}
       </div>
       {error ? (
-        <p className="text-xs text-destructive">{error}</p>
+        <p id={descId} className="text-xs text-destructive">
+          {error}
+        </p>
       ) : helper ? (
-        <p className="text-xs text-muted-foreground/70">{helper}</p>
+        <p id={descId} className="text-xs text-muted-foreground">
+          {helper}
+        </p>
       ) : null}
     </div>
   );

@@ -3,7 +3,7 @@
  * 类别即配件身份（三通/螺母…极少换组）：组头即类别，组内「+」直接新增该类配件。
  */
 
-import { useMemo } from 'react';
+import { useId, useMemo } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -62,7 +62,7 @@ export function AccessoriesConfig() {
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">
-          默认配件配置 <span className="ml-1 text-muted-foreground/60">({totalCount} 项)</span>
+          默认配件配置 <span className="ml-1 text-muted-foreground">({totalCount} 项)</span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -84,7 +84,7 @@ export function AccessoriesConfig() {
               </Button>
             </div>
             {items.length === 0 ? (
-              <p className="py-1 text-xs text-muted-foreground/70">暂无该类配件</p>
+              <p className="py-1 text-xs text-muted-foreground">暂无该类配件</p>
             ) : (
               <div className="space-y-1">
                 {/* 表头与配件行同列宽（名称自适应 / 数量 / 单价 / 删除） */}
@@ -132,7 +132,7 @@ export function AccessoriesConfig() {
                           updateAccessory(i, { defaultQuantity: toCount(e.target.value) })
                         }
                         aria-label="默认数量"
-                        className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular focus-interlock"
+                        className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-base sm:text-sm tabular focus-interlock"
                       />
                       <input
                         type="number"
@@ -144,14 +144,14 @@ export function AccessoriesConfig() {
                           updateAccessory(i, { defaultUnitPrice: toPrice(e.target.value) })
                         }
                         aria-label="默认单价"
-                        className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular focus-interlock"
+                        className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-base sm:text-sm tabular focus-interlock"
                       />
                       <button
                         type="button"
                         title="删除"
                         aria-label="删除"
                         onClick={() => removeAccessory(i)}
-                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -186,36 +186,49 @@ function AccessoryFields({
   unitPrice: number;
   onUpdate: ReturnType<typeof useSettingsStore.getState>['updateAccessory'];
 }) {
+  // 可见 label 经 htmlFor 关联（i 是渲染序号、非稳定 id，这里用 useId 保证唯一）
+  const idName = useId();
+  const idQty = useId();
+  const idPrice = useId();
   return (
     <>
       <div className="col-span-full">
-        <label className="mb-1 block text-xs text-muted-foreground">名称</label>
+        <label htmlFor={idName} className="mb-1 block text-xs text-muted-foreground">
+          名称
+        </label>
         <Input
+          id={idName}
           value={name}
           onChange={(e) => onUpdate(i, { name: e.target.value })}
           className="h-8"
         />
       </div>
       <div>
-        <label className="mb-1 block text-xs text-muted-foreground">数量</label>
+        <label htmlFor={idQty} className="mb-1 block text-xs text-muted-foreground">
+          数量
+        </label>
         <input
+          id={idQty}
           type="number"
           min={0}
           step={1}
           value={quantity}
           onChange={(e) => onUpdate(i, { defaultQuantity: toCount(e.target.value) })}
-          className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular"
+          className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-base sm:text-sm tabular"
         />
       </div>
       <div>
-        <label className="mb-1 block text-xs text-muted-foreground">单价</label>
+        <label htmlFor={idPrice} className="mb-1 block text-xs text-muted-foreground">
+          单价
+        </label>
         <input
+          id={idPrice}
           type="number"
           min={0}
           step={0.01}
           value={unitPrice}
           onChange={(e) => onUpdate(i, { defaultUnitPrice: toPrice(e.target.value) })}
-          className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular"
+          className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-base sm:text-sm tabular"
         />
       </div>
       <RemoveInline i={i} />
@@ -231,7 +244,7 @@ function RemoveInline({ i }: { i: number }) {
       onClick={() => removeAccessory(i)}
       title="删除"
       aria-label="删除"
-      className="mt-auto flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive"
+      className="mt-auto flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
     >
       <Trash2 className="h-3.5 w-3.5" />
     </button>
