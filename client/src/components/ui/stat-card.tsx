@@ -34,14 +34,14 @@ export function StatCard({ label, value, hint, accent = 'default' }: StatCardPro
       <div
         className={cn(
           'mt-2 pl-3 font-mono-display text-lg font-bold tabular sm:text-2xl',
-          accent === 'good' && 'text-emerald-600 dark:text-emerald-400',
+          accent === 'good' && 'text-emerald-700 dark:text-emerald-400',
           accent === 'bad' && 'text-destructive',
-          accent === 'gold' && 'text-accent',
+          accent === 'gold' && 'text-accent-strong',
         )}
       >
         {value}
       </div>
-      {hint && <div className="label-mono mt-1.5 pl-3 text-[10px] text-muted-foreground/70 sm:text-xs">{hint}</div>}
+      {hint && <div className="label-mono mt-1.5 pl-3 text-[10px] text-muted-foreground sm:text-xs">{hint}</div>}
     </Card>
   );
 }

@@ -16,8 +16,11 @@
     --secondary-foreground: 60 3.7% 10.6%;
     --muted: 60 5% 92.2%;
     --muted-foreground: 44 5% 43%; /* 暖灰次要文字 */
-    --accent: 38 60% 56%; /* #C9A961 暖金强调（保留品牌金） */
+    --accent: 38 60% 56%; /* #C9A961 暖金强调（保留品牌金，用于填充/图形） */
     --accent-foreground: 60 3.7% 10.6%;
+    /* 品牌金的文字用档：亮色下原金对纸面仅 2.29:1（<4.5），文字与聚焦环场合用深金（同色相 ~41°，4.5:1+）。
+       暗色下原金即达标（8.8:1），两档同值。 */
+    --accent-strong: 40 50% 33%; /* ≈#7d622a 深金 */
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     --border: 60 5% 91.5%; /* 发丝线：只作切分提示，层级交给明度差 */
@@ -51,6 +54,7 @@
     --muted-foreground: 60 4% 62%; /* 次要文字提亮，深色下易读 */
     --accent: 38 60% 62%; /* 暖金在深色下更亮，保证可见 */
     --accent-foreground: 60 4% 10%;
+    --accent-strong: 38 60% 62%; /* 暗色下品牌金即达标，与 --accent 同值 */
     --destructive: 0 62% 55%; /* 红色提亮 */
     --destructive-foreground: 0 0% 100%;
     --border: 60 2% 14.5%; /* 卡面与次级面之间的发丝线 */
@@ -89,8 +93,7 @@
       -apple-system,
       'Microsoft YaHei',
       sans-serif;
-    /* 铁律6：数字锁等宽，金额、编号、尺寸变化不抖动 */
-    font-feature-settings: 'tnum' 1;
+    /* 铁律6：数字锁等宽，金额、编号、尺寸变化不抖动（font-variant-numeric 属性优先于 raw tag） */
     font-variant-numeric: tabular-nums;
     transition:
       background-color 0.2s,
@@ -121,6 +124,19 @@
   .font-mono {
     font-variant-numeric: tabular-nums;
   }
+  /* prefers-reduced-motion：装饰性动效（页面入场/对勾微弹/卡片抬升/图标旋转/spinner）
+     一律退化为瞬时状态切换——语义由颜色与文字承载，信息不丢。
+     JS 侧动效（spring 数字、图表入场、3D 自转）由 use-prefers-reduced-motion 单独接人。 */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 @layer utilities {
@@ -139,12 +155,13 @@
       'Microsoft YaHei', sans-serif;
     font-variant-numeric: tabular-nums;
   }
-  /* 铁律2：输入框聚焦双环咬合——内环贴边（深）+ 外环外扩 3px（浅），不加 outline */
+  /* 铁律2：输入框聚焦双环咬合——内环贴边（深）+ 外环外扩 3px（浅），不加 outline。
+     内环走 --accent-strong 实色：聚焦指示需对相邻色 ≥3:1（品牌金原值亮色下 2.15:1 不足）。 */
   .focus-interlock:focus-visible {
     outline: none;
-    border-color: hsl(var(--accent) / 0.85);
+    border-color: hsl(var(--accent-strong));
     box-shadow:
-      inset 0 0 0 1px hsl(var(--accent) / 0.85),
+      inset 0 0 0 1px hsl(var(--accent-strong)),
       0 0 0 3px hsl(var(--accent) / 0.2);
   }
   /* 铁律5：文本流内图标对齐文字视觉中心 */

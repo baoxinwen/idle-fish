@@ -27,7 +27,7 @@ export function CostSummary() {
     if (!enabled) return <Row label={label} value="未计入" muted />;
     if (fee === 0)
       return (
-        <Row label={label} value="¥0.00（已勾选）" className="text-amber-600 dark:text-amber-400" />
+        <Row label={label} value="¥0.00（已勾选）" className="text-amber-700 dark:text-amber-400" />
       );
     return <Row label={label} value={formatMoney(fee)} />;
   }
@@ -83,7 +83,7 @@ export function CostSummary() {
               <div className="label-mono text-xs text-muted-foreground">最终报价</div>
               <SpringMoney
                 value={result.finalPrice}
-                className="tabular text-2xl font-bold text-accent sm:text-3xl"
+                className="tabular text-2xl font-bold text-accent-strong sm:text-3xl"
               />
             </div>
             <div className="text-left sm:text-right">
@@ -134,7 +134,7 @@ function Row({
         className={cn(
           'tabular',
           bold && 'font-semibold',
-          muted && 'text-muted-foreground/60',
+          muted && 'text-muted-foreground',
           className,
         )}
       >

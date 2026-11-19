@@ -83,7 +83,7 @@ export function CommandPalette() {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh]">
       <div
-        className="absolute inset-0 bg-[#0b0b0a]/45 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-sidebar/45 backdrop-blur-[2px]"
         onClick={() => setOpen(false)}
       />
       <Command
@@ -94,10 +94,11 @@ export function CommandPalette() {
           <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
           <Command.Input
             placeholder="搜索命令 / 报价编号 / 订单号 / 客户…"
+            aria-label="搜索命令与记录"
             className="h-11 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
         </div>
-        <Command.List className="max-h-[380px] overflow-y-auto p-2">
+        <Command.List className="max-h-[380px] overflow-y-auto overscroll-contain p-2">
           <Command.Empty className="py-6 text-center text-sm text-muted-foreground">
             无匹配结果
           </Command.Empty>

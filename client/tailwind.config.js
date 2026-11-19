@@ -2,6 +2,8 @@
 export default {
   darkMode: 'class',
   content: ['./index.html', './src/**/*.{ts,tsx}'],
+  // Tailwind 3 的 hover: 默认不问指针类型，触屏点按后 hover 态粘滞（better-ui）。
+  // 开启后 hover: 编译进 @media (hover: hover)，指针型设备才生效（Tailwind 4 默认行为）。
   theme: {
     extend: {
       colors: {
@@ -29,6 +31,8 @@ export default {
         accent: {
           DEFAULT: 'hsl(var(--accent))',
           foreground: 'hsl(var(--accent-foreground))',
+          /** 文字/细环用深金档（亮色对比达标），见 globals.css --accent-strong */
+          strong: 'hsl(var(--accent-strong))',
         },
         card: {
           DEFAULT: 'hsl(var(--card))',
@@ -73,6 +77,9 @@ export default {
         ],
       },
     },
+  },
+  future: {
+    hoverOnlyWhenSupported: true,
   },
   plugins: [require('tailwindcss-animate')],
 };

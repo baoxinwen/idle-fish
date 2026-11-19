@@ -42,10 +42,11 @@ export function formatCompactMoney(value: number): string {
   return formatMoney(value);
 }
 
-/** 利润正负配色类：正=绿，负=红。统一利润数值配色口径（第八轮 F-08：内联三元已全部收口至此） */
+/** 利润正负配色类：正=绿，负=红。统一利润数值配色口径（第八轮 F-08：内联三元已全部收口至此）。
+    亮色用 emerald-700：emerald-600 对卡面实测 3.67:1 < 4.5 文字门槛。 */
 export function profitColor(value: number): string {
   return value >= 0
-    ? 'text-emerald-600 dark:text-emerald-400'
+    ? 'text-emerald-700 dark:text-emerald-400'
     : 'text-destructive';
 }
 

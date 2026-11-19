@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 export function LoadingState({ text = '加载中…', className }: { text?: string; className?: string }) {
   return (
     <div className={cn('flex h-full min-h-[200px] items-center justify-center text-sm text-muted-foreground', className)}>
-      <Loader2 className="mr-2 h-5 w-5 animate-spin text-accent" />
+      <Loader2 className="mr-2 h-5 w-5 animate-spin text-accent-strong" />
       {text}
     </div>
   );
@@ -35,7 +35,7 @@ export function EmptyState({
     <div className={cn('flex flex-col items-center justify-center py-16 text-center', className)}>
       {Icon && (
         <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-secondary ring-1 ring-border">
-          <Icon className="h-7 w-7 text-muted-foreground/50" />
+          <Icon className="h-7 w-7 text-muted-foreground/80" />
         </div>
       )}
       <div className="text-sm font-medium text-foreground">{text}</div>

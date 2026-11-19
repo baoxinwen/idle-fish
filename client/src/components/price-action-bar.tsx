@@ -35,10 +35,10 @@ export function PriceActionBar({ value, label = '最终报价', hint, danger, on
             value={value}
             className={cn(
               'truncate font-mono-display text-xl font-bold tabular',
-              danger ? 'text-destructive' : 'text-accent',
+              danger ? 'text-destructive' : 'text-accent-strong',
             )}
           />
-          {hint && <div className="label-mono truncate text-[10px] text-muted-foreground/70">{hint}</div>}
+          {hint && <div className="label-mono truncate text-[10px] text-muted-foreground">{hint}</div>}
         </div>
         <Button variant="accent" className="ml-auto shrink-0" onClick={onSave} disabled={saving || disabled}>
           <Save className="h-4 w-4" />

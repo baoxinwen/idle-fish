@@ -51,9 +51,10 @@ export function CopyButton({
       aria-label={done ? '已复制' : label}
       onClick={handleClick}
       className={cn(
-        'inline-flex items-center justify-center rounded p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+        // p-1.5 -m-1.5：视觉不变、命中区扩到 ~26px（2.5.8 基线 24px）
+        'inline-flex items-center justify-center rounded p-1.5 -m-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong',
         done
-          ? 'text-emerald-600 dark:text-emerald-400'
+          ? 'text-emerald-700 dark:text-emerald-400'
           : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
         className,
       )}

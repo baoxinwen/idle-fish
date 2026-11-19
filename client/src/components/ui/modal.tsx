@@ -34,7 +34,8 @@ export function Modal({ open, onClose, title, children, size = 'md', className }
   return (
     <Drawer.Root open={open} onOpenChange={(o) => !o && onClose()} direction="bottom">
       <Drawer.Portal>
-        <Drawer.Overlay className="fixed inset-0 z-50 bg-[#0b0b0a]/45 backdrop-blur-[2px]" />
+        {/* backdrop 走 --sidebar 令牌（同 #0b0b0a），不再硬编码色值 */}
+        <Drawer.Overlay className="fixed inset-0 z-50 bg-sidebar/45 backdrop-blur-[2px]" />
         <Drawer.Content
           className={cn(
             // 移动端：底部抽屉，圆角顶部
@@ -50,11 +51,18 @@ export function Modal({ open, onClose, title, children, size = 'md', className }
           <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted sm:hidden" />
           <div className="mb-4 flex items-center justify-between px-5 pt-4">
             <Drawer.Title className="text-base font-semibold">{title}</Drawer.Title>
-            <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            {/* 关闭钮扩大命中区至 ≥24px（2.5.8），负 margin 不挤标题行 */}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="关闭"
+              className="-mr-2 rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+            >
               <X className="h-4 w-4" />
             </button>
           </div>
-          <div className="overflow-y-auto px-5 pb-5">{children}</div>
+          {/* overscroll-contain：滚到头不带动背后页面（better-ui 滚动包含） */}
+          <div className="overflow-y-auto overscroll-contain px-5 pb-5">{children}</div>
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>

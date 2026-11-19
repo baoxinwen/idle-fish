@@ -54,12 +54,13 @@ export function ListToolbar<K extends string>({
               value={query}
               onChange={(e) => onQueryChange(e.target.value)}
               placeholder={searchPlaceholder}
-              className={cn('h-8 pl-8 text-xs')}
+              aria-label="搜索"
+              className={cn('h-8 pl-8')}
             />
           </div>
         )}
         {resultLabel && (
-          <span className="label-mono shrink-0 text-[10px] text-muted-foreground/70">{resultLabel}</span>
+          <span className="label-mono shrink-0 text-[10px] text-muted-foreground">{resultLabel}</span>
         )}
       </div>
     </div>

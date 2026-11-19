@@ -18,7 +18,7 @@ export function AuthShell({ title, subtitle, onSubmit, children }: AuthShellProp
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-accent/15 ring-1 ring-accent/30">
-            <span className="font-mono-display text-lg font-bold text-accent">铝</span>
+            <span className="font-mono-display text-lg font-bold text-accent-strong">铝</span>
           </div>
           <h1 className="font-mono-display text-xl font-bold tracking-wide">{title}</h1>
           <p className="label-mono mt-1 text-xs text-muted-foreground">{subtitle}</p>

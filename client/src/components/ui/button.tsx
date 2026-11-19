@@ -4,7 +4,8 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,background-color,border-color,box-shadow,transform,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.97]',
+  // 聚焦环走 accent-strong 实色：环是聚焦指示，需对相邻色 ≥3:1（accent/40 实测 1.31:1 不足）
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,background-color,border-color,box-shadow,transform,opacity] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong disabled:pointer-events-none disabled:opacity-50 enabled:active:scale-[0.96]',
   {
     variants: {
       variant: {
@@ -14,7 +15,7 @@ const buttonVariants = cva(
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         ghost: 'hover:bg-secondary hover:text-secondary-foreground',
         accent: 'bg-accent text-accent-foreground hover:bg-accent/90 shadow-sm',
-        link: 'text-accent underline-offset-4 hover:underline',
+        link: 'text-accent-strong underline-offset-4 hover:underline',
       },
       size: {
         default: 'h-9 px-4 py-2',

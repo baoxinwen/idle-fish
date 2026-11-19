@@ -22,8 +22,9 @@ export function Switch({ checked, onCheckedChange, disabled, ariaLabel, classNam
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
       className={cn(
-        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40',
+        // before 伪元素上下扩 8px：命中区 20px→36px 高（2.5.8），视觉不变
+        'relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors before:absolute before:inset-x-0 before:-inset-y-2 before:rounded-full before:content-[""]',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong',
         checked ? 'bg-accent' : 'bg-secondary ring-1 ring-border',
         disabled && 'cursor-not-allowed opacity-50',
         className,
