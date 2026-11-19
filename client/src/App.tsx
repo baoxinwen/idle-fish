@@ -55,7 +55,9 @@ const router = createBrowserRouter([
 
 export default function App() {
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+    // disableTransitionOnChange：切主题时先摘掉全局 transition（body 有 0.2s 颜色过渡），
+    // 否则全页颜色同时过渡、切换发糊（better-ui 主题切换抑制配方）
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
       <RouterProvider router={router} />
       <Toaster />
       <ConfirmHost />
