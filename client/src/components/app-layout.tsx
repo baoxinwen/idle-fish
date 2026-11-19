@@ -103,7 +103,7 @@ export function AppLayout() {
         <div className="border-t border-white/5 p-4">
           <div className="label-mono text-sidebar-foreground/60">铝型材机柜 · 报价工具</div>
           <div className="font-mono-display mt-1 text-[10px] text-sidebar-foreground/60">
-            v0.1 · local
+            v{__APP_VERSION__}
           </div>
         </div>
       </aside>
