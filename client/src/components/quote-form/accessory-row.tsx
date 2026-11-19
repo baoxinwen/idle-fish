@@ -27,7 +27,14 @@ interface AccessoryRowProps {
   showRemove?: boolean;
 }
 
-export function AccessoryRow({ item, index, onUpdate, onRemove, nameEditable, showRemove = true }: AccessoryRowProps) {
+export function AccessoryRow({
+  item,
+  index,
+  onUpdate,
+  onRemove,
+  nameEditable,
+  showRemove = true,
+}: AccessoryRowProps) {
   const patch = (p: Partial<AccessoryItem>) => onUpdate(index, p);
   const remove = onRemove ? () => onRemove(index) : undefined;
 
@@ -53,8 +60,17 @@ export function AccessoryRow({ item, index, onUpdate, onRemove, nameEditable, sh
           className="mt-2 grid items-end gap-2"
           style={{ gridTemplateColumns: '72px 88px minmax(0,1fr) auto' }}
         >
-          <NumCell label="数量" value={item.quantity} onChange={(v) => patch({ quantity: toCount(String(v)) })} />
-          <NumCell label="单价" value={item.unitPrice} decimal onChange={(v) => patch({ unitPrice: toPrice(String(v)) })} />
+          <NumCell
+            label="数量"
+            value={item.quantity}
+            onChange={(v) => patch({ quantity: toCount(String(v)) })}
+          />
+          <NumCell
+            label="单价"
+            value={item.unitPrice}
+            decimal
+            onChange={(v) => patch({ unitPrice: toPrice(String(v)) })}
+          />
           <SubtotalCell value={item.quantity * item.unitPrice} />
           <RemoveCell showRemove={showRemove} onRemove={remove} />
         </div>
@@ -77,8 +93,19 @@ export function AccessoryRow({ item, index, onUpdate, onRemove, nameEditable, sh
             <div className="flex h-8 items-center truncate text-sm">{item.name}</div>
           )}
         </div>
-        <NumCell label="数量" value={item.quantity} onChange={(v) => patch({ quantity: toCount(String(v)) })} compact />
-        <NumCell label="单价" value={item.unitPrice} decimal onChange={(v) => patch({ unitPrice: toPrice(String(v)) })} compact />
+        <NumCell
+          label="数量"
+          value={item.quantity}
+          onChange={(v) => patch({ quantity: toCount(String(v)) })}
+          compact
+        />
+        <NumCell
+          label="单价"
+          value={item.unitPrice}
+          decimal
+          onChange={(v) => patch({ unitPrice: toPrice(String(v)) })}
+          compact
+        />
         <SubtotalCell value={item.quantity * item.unitPrice} compact />
         <RemoveCell showRemove={showRemove} onRemove={remove} alignRight />
       </div>
@@ -135,7 +162,7 @@ function NumCell({
           if (n !== null) onChange(n);
         }}
         aria-label={compact ? label : undefined}
-        className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+        className="h-8 w-full rounded-md border border-input bg-background px-2 text-right text-sm tabular focus-interlock"
       />
     </div>
   );
