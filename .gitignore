@@ -44,3 +44,6 @@ CLAUDE.md
 
 # TS 增量构建缓存
 *.tsbuildinfo
+
+# .mimosa 插件产物（本地工具生成，不入库）
+.mimosa/
