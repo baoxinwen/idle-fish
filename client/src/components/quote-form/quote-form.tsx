@@ -67,13 +67,13 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
       {/* 单价引导：首次使用最常见的坑——所有单价为 0 却直接保存 */}
       {!hasAnyPrice && !priceHintDismissed && (
         <div className="flex items-start gap-2 rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 text-sm">
-          <Store className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+          <Store className="mt-0.5 h-4 w-4 shrink-0 text-accent-strong" />
           <p className="flex-1 text-muted-foreground">
             配件单价当前均为{' '}
             <span className="font-mono-display font-semibold text-foreground">¥0.00</span>
             ，建议先到{' '}
             <button
-              className="font-medium text-accent underline-offset-2 hover:underline"
+              className="font-medium text-accent-strong underline-offset-2 hover:underline"
               onClick={() => navigate('/settings')}
             >
               设置 → 配件配置
@@ -181,7 +181,7 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
                   <Label className="text-xs text-muted-foreground">{CATEGORY_LABEL[cat]}</Label>
                   {cat === 'tray' && trayCoeffsSet && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      建议价：{suggestedPrice.toFixed(2)}
+                      建议价 ¥{suggestedPrice.toFixed(2)}
                       <Button
                         variant="ghost"
                         size="sm"
@@ -261,10 +261,14 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
           费用三项已在上方「费用计入」中编辑，重复入口曾导致同字段两处修改互相踩。 */}
       <Card>
         <div className="flex w-full items-center justify-between p-4">
-          <button className="flex items-center gap-2" onClick={() => setShowPricing((v) => !v)}>
-            <CardTitle className="label-mono text-xs font-semibold text-muted-foreground">
-              计价参数
-            </CardTitle>
+          {/* 折叠披露：aria-expanded 暴露开合状态；按钮内不放块级元素 */}
+          <button
+            type="button"
+            aria-expanded={showPricing}
+            className="flex items-center gap-2"
+            onClick={() => setShowPricing((v) => !v)}
+          >
+            <span className="label-mono text-xs font-semibold text-muted-foreground">计价参数</span>
             {showPricing ? (
               <ChevronDown className="h-4 w-4" />
             ) : (
@@ -289,7 +293,7 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
               会把 ParamRow 挤到输入框塌缩成竖条（固定开销 176px > 列宽），见布局回归测试 */}
           <CardContent className="grid grid-cols-1 pt-0">
             <div>
-              <div className="label-mono mb-1 border-b border-border pb-1 text-[10px] text-muted-foreground/70">
+              <div className="label-mono mb-1 border-b border-border pb-1 text-[10px] text-muted-foreground">
                 型材
               </div>
               <ParamRow
@@ -322,7 +326,7 @@ export function QuoteForm({ settings }: { settings: Settings | null }) {
               />
             </div>
             <div>
-              <div className="label-mono mb-1 mt-3 border-b border-border pb-1 text-[10px] text-muted-foreground/70">
+              <div className="label-mono mb-1 mt-3 border-b border-border pb-1 text-[10px] text-muted-foreground">
                 托盘
               </div>
               {/* F-02：托盘系数允许负值（与设置页/shared schema 口径一致），必须传 unclamped */}
@@ -379,6 +383,7 @@ function FeeToggleRow({
           step={0.01}
           suffix="元"
           displayDecimals={2}
+          ariaLabel={`${label}金额`}
           className="w-36"
         />
         <Switch checked={enabled} onCheckedChange={onEnabledChange} ariaLabel={`计入${label}`} />
