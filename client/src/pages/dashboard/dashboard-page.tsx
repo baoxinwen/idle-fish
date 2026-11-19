@@ -5,12 +5,16 @@
 
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTheme } from 'next-themes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState, LoadingState } from '@/components/states';
 import { StatCard } from '@/components/ui/stat-card';
+import { PageHeader } from '@/components/ui/page-header';
 import { statsApi } from '@/lib/api';
+import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
+import { usePageTitle } from '@/lib/use-page-title';
 import { ORDER_STATUS_LABEL, ORDER_STATUS_BADGE, QUOTE_STATUS_LABEL } from '@/lib/status';
 import { formatMoney, formatCompactMoney, cn } from '@/lib/utils';
 import type { StatsData, StatsRange } from '@idle-fish/shared';
@@ -38,22 +42,32 @@ const RANGES: { key: StatsRange; label: string }[] = [
   { key: 'all', label: '全部' },
 ];
 
-// 主题图表色板（与 globals.css 工程蓝图风协调，低饱和度）
-const CHART = {
-  blue: '#1E3A5F', // 墨蓝 - 报价
-  gold: '#C9A961', // 暖金 - 订单/利润
-  slate: '#64748B', // 石板灰 - 辅助
+// 图表色板按主题取档：图形对卡面需 ≥3:1（1.4.11）。实测暗色下墨蓝 1.59:1、shipped 2.62、
+// cancelled 2.82、亮色下品牌金 2.19 均不足，故分主题给值；色相与 lib/status.ts 徽章变体
+// 一一对应（secondary/accent/warning/default/success/destructive）不变。
+const CHART_LIGHT = {
+  blue: '#1E3A5F', // 墨蓝 - 报价（亮色 11.2:1）
+  gold: '#a08040', // 深金 - 订单/利润（品牌金亮色 2.19:1 不足，降档后 3.65:1）
 };
-
-// 状态色板：与 lib/status.ts 的徽章变体一一对应（secondary/accent/warning/default/success/
-// destructive），同一状态在徽章、图例、环形图里是同一种颜色。中明度色值保证亮暗主题可读。
-const STATUS_COLORS: Record<string, string> = {
+const CHART_DARK = {
+  blue: '#5B84B1', // 提亮墨蓝（#1E3A5F 暗色 1.59:1 不足，提亮后 4.7:1）
+  gold: '#C9A961', // 品牌金（暗色 8.1:1）
+};
+const STATUS_LIGHT: Record<string, string> = {
   pending: '#78716C', // 暖灰 - secondary
-  producing: '#C9A961', // 品牌金 - accent
+  producing: '#a08040', // 深金 - accent
   ready: '#D97706', // amber-600 - warning
   shipped: '#3E5C7A', // 墨蓝 - default(primary)
   done: '#059669', // emerald-600 - success
   cancelled: '#B91C1C', // red-700 - destructive
+};
+const STATUS_DARK: Record<string, string> = {
+  pending: '#78716C',
+  producing: '#C9A961', // 品牌金（暗色直接达标）
+  ready: '#D97706',
+  shipped: '#56799B', // 提亮墨蓝
+  done: '#059669',
+  cancelled: '#EF4444', // red-500（red-700 暗色 2.82:1 不足）
 };
 
 const AXIS_TICK = { fontSize: 11, fill: 'hsl(var(--muted-foreground))' };
@@ -86,7 +100,13 @@ function formatDate(date: string, range: StatsRange): string {
 }
 
 export function DashboardPage() {
+  usePageTitle('经营统计');
   const navigate = useNavigate();
+  const reducedMotion = usePrefersReducedMotion();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  const CHART = isDark ? CHART_DARK : CHART_LIGHT;
+  const STATUS_COLORS = isDark ? STATUS_DARK : STATUS_LIGHT;
   const [data, setData] = useState<StatsData | null>(null);
   const [range, setRange] = useState<StatsRange>('30d');
   // F-06：错误态 + 手动重试（此前失败后永久停留「加载中…」且无重试路径）
@@ -131,28 +151,26 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight lg:text-2xl">经营统计</h1>
-          <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
-            报价与订单数据、利润趋势、状态分布
-          </p>
-        </div>
-        {/* 区间选择：移动端可横滚 */}
-        <div className="flex gap-1 overflow-x-auto pb-1 sm:pb-0">
-          {RANGES.map((r) => (
-            <Button
-              key={r.key}
-              variant={range === r.key ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setRange(r.key)}
-              className="shrink-0"
-            >
-              {r.label}
-            </Button>
-          ))}
-        </div>
-      </div>
+      <PageHeader
+        title="经营统计"
+        description="报价与订单数据、利润趋势、状态分布"
+        actions={
+          /* 区间选择：移动端可横滚 */
+          <div className="flex gap-1 overflow-x-auto pb-1 sm:pb-0">
+            {RANGES.map((r) => (
+              <Button
+                key={r.key}
+                variant={range === r.key ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setRange(r.key)}
+                className="shrink-0"
+              >
+                {r.label}
+              </Button>
+            ))}
+          </div>
+        }
+      />
 
       {/* 指标卡：移动端 2 列，PC 4 列 */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -187,7 +205,17 @@ export function DashboardPage() {
             ) : (
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>
-                  <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} innerRadius={38} paddingAngle={2}>
+                  <Pie
+                    data={pieData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={75}
+                    innerRadius={38}
+                    paddingAngle={2}
+                    isAnimationActive={!reducedMotion}
+                  >
                     {pieData.map((d) => (
                       <Cell key={d.status} fill={STATUS_COLORS[d.status]} stroke="hsl(var(--card))" strokeWidth={2} />
                     ))}
@@ -226,8 +254,8 @@ export function DashboardPage() {
                   <XAxis dataKey="date" tick={AXIS_TICK} tickFormatter={(d) => formatDate(d, range)} minTickGap={24} axisLine={false} tickLine={false} />
                   <YAxis allowDecimals={false} tick={AXIS_TICK} width={32} axisLine={false} tickLine={false} />
                   <Tooltip content={<ChartTooltip />} />
-                  <Line type="monotone" dataKey="quoteCount" name="报价数" stroke={CHART.blue} strokeWidth={2.5} dot={showDots ? { r: 3, fill: CHART.blue } : false} activeDot={{ r: 4 }} />
-                  <Line type="monotone" dataKey="orderCount" name="订单数" stroke={CHART.gold} strokeWidth={2.5} dot={showDots ? { r: 3, fill: CHART.gold } : false} activeDot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="quoteCount" name="报价数" stroke={CHART.blue} strokeWidth={2.5} dot={showDots ? { r: 3, fill: CHART.blue } : false} activeDot={{ r: 4 }} isAnimationActive={!reducedMotion} />
+                  <Line type="monotone" dataKey="orderCount" name="订单数" stroke={CHART.gold} strokeWidth={2.5} dot={showDots ? { r: 3, fill: CHART.gold } : false} activeDot={{ r: 4 }} isAnimationActive={!reducedMotion} />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -265,9 +293,9 @@ export function DashboardPage() {
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }} />
                 {/* 零基线：单笔亏损时整图只有负柱，无基线难以读值 */}
                 <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" />
-                <Bar dataKey="profit" name="利润" maxBarSize={32} radius={[4, 4, 0, 0]}>
+                <Bar dataKey="profit" name="利润" maxBarSize={32} radius={[4, 4, 0, 0]} isAnimationActive={!reducedMotion}>
                   {data.trend.map((t) => (
-                    <Cell key={t.date} fill={t.profit >= 0 ? CHART.gold : '#B91C1C'} />
+                    <Cell key={t.date} fill={t.profit >= 0 ? CHART.gold : isDark ? '#EF4444' : '#B91C1C'} />
                   ))}
                 </Bar>
               </BarChart>
@@ -296,10 +324,17 @@ export function DashboardPage() {
                           onClick={() => navigate(`/quotes/${q.id}`)}
                           className="cursor-pointer border-b transition-colors last:border-0 hover:bg-secondary/50"
                         >
-                          <td className="px-4 py-2 tabular font-medium">{q.quoteNo}</td>
+                          <td className="px-4 py-2 tabular font-medium">
+                            <Link
+                              to={`/quotes/${q.id}`}
+                              className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+                            >
+                              {q.quoteNo}
+                            </Link>
+                          </td>
                           <td className="px-4 py-2 text-right tabular">{formatMoney(q.finalPrice)}</td>
                           <td className="px-4 py-2 text-right">
-                            <span className={cn('text-xs', q.status === 'converted' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')}>
+                            <span className={cn('text-xs', q.status === 'converted' ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground')}>
                               {QUOTE_STATUS_LABEL[q.status]}
                             </span>
                           </td>
@@ -309,7 +344,7 @@ export function DashboardPage() {
                   </table>
                 </div>
                 <div className="mt-1 border-t px-4 pt-2 text-right">
-                  <Link to="/quotes" className="text-xs text-accent hover:underline">
+                  <Link to="/quotes" className="text-xs text-accent-strong hover:underline">
                     查看全部报价 →
                   </Link>
                 </div>
@@ -336,7 +371,14 @@ export function DashboardPage() {
                           onClick={() => navigate(`/orders/${o.id}`)}
                           className="cursor-pointer border-b transition-colors last:border-0 hover:bg-secondary/50"
                         >
-                          <td className="px-4 py-2 tabular font-medium">{o.orderNo}</td>
+                          <td className="px-4 py-2 tabular font-medium">
+                            <Link
+                              to={`/orders/${o.id}`}
+                              className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+                            >
+                              {o.orderNo}
+                            </Link>
+                          </td>
                           <td className="px-4 py-2 text-muted-foreground">{o.customerName || '—'}</td>
                           <td className="px-4 py-2 text-right tabular">{formatMoney(o.actualPrice)}</td>
                           <td className="px-4 py-2 text-right">
@@ -350,7 +392,7 @@ export function DashboardPage() {
                   </table>
                 </div>
                 <div className="mt-1 border-t px-4 pt-2 text-right">
-                  <Link to="/orders" className="text-xs text-accent hover:underline">
+                  <Link to="/orders" className="text-xs text-accent-strong hover:underline">
                     查看全部订单 →
                   </Link>
                 </div>
