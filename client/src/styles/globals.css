@@ -94,15 +94,19 @@
 }
 
 @layer utilities {
-  /* 工程标签：等宽小号 + 字间距，用于标签、编号、小标题 */
+  /* 工程标签：等宽小号 + 字间距，用于标签、编号、小标题。
+     CJK 回退到正文界面字体——JetBrains 无 CJK 字形，落到 generic monospace
+     会变成未选定的系统衬线体（闲鱼字标等处的事故来源） */
   .label-mono {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'Inter Variable',
+      'Microsoft YaHei', sans-serif;
     font-size: 0.6875rem;
     letter-spacing: 0.08em;
     font-variant-numeric: tabular-nums;
   }
   .font-mono-display {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'Inter Variable',
+      'Microsoft YaHei', sans-serif;
     font-variant-numeric: tabular-nums;
   }
   /* 可交互卡片 hover 微抬升（Emil 风格物理感） */

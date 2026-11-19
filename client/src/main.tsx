@@ -1,13 +1,8 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import '@fontsource/inter/400.css';
-import '@fontsource/inter/500.css';
-import '@fontsource/inter/600.css';
-import '@fontsource/inter/700.css';
-import '@fontsource/jetbrains-mono/400.css';
-import '@fontsource/jetbrains-mono/500.css';
-import '@fontsource/jetbrains-mono/600.css';
-import '@fontsource/jetbrains-mono/700.css';
+/* 变量字体：暗色字重补偿（400→360 等小数档）依赖连续 wght 轴，静态整档包做不到 */
+import '@fontsource-variable/inter';
+import '@fontsource-variable/jetbrains-mono';
 import App from './App';
 import './styles/globals.css';
 
