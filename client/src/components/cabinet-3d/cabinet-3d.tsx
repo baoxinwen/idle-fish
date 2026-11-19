@@ -12,6 +12,7 @@ import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import type { CabinetSize, ProfileColor } from '@idle-fish/shared';
 import { SIZE_GAP } from '@idle-fish/shared';
+import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
 
 interface Cabinet3DProps {
   size: CabinetSize;
@@ -38,6 +39,8 @@ export function Cabinet3D({ size, color }: Cabinet3DProps) {
     silver: { material: '#e4e4e7', edge: '#a1a1aa', node: '#d4d4d8' },
   } as const;
   const colorCfg = COLOR_MAP[color];
+  // 减弱动态效果：停自转，拖拽旋转仍可用（2.5.7 单指针替代路径本就存在）
+  const reducedMotion = usePrefersReducedMotion();
 
   if (inner.w <= 0 && inner.d <= 0 && inner.h <= 0) {
     return (
@@ -68,7 +71,7 @@ export function Cabinet3D({ size, color }: Cabinet3DProps) {
 
       <OrbitControls
         enablePan={false}
-        autoRotate
+        autoRotate={!reducedMotion}
         autoRotateSpeed={0.8}
         minDistance={0.8}
         maxDistance={5}

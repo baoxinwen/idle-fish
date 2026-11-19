@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { usePrefersReducedMotion } from './use-prefers-reduced-motion';
 
 /** spring 参数：刚度/阻尼/质量，调出柔和回弹 */
 const STIFFNESS = 170;
@@ -16,10 +17,18 @@ export function useSpringNumber(target: number): number {
   const current = useRef(target);
   const velocity = useRef(0);
   const raf = useRef<number>(0);
+  const reducedMotion = usePrefersReducedMotion();
 
   useEffect(() => {
     const from = current.current;
     if (from === target) return;
+    // 减弱动态效果：跳过弹簧直接落值，语义由数字本身承载
+    if (reducedMotion) {
+      current.current = target;
+      velocity.current = 0;
+      setValue(target);
+      return;
+    }
 
     // L9：目标为 Infinity/NaN（如输入 "1e999" 触发 M10 之前的一帧）时弹簧永不收敛，
     // rAF 会 60fps 空转且渲染 ¥NaN——非有限目标直接跳变并退出动画。
@@ -50,7 +59,7 @@ export function useSpringNumber(target: number): number {
     };
     raf.current = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf.current);
-  }, [target]);
+  }, [target, reducedMotion]);
 
   return value;
 }
