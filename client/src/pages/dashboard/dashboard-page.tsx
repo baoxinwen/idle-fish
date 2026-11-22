@@ -1,0 +1,410 @@
+/**
+ * 经营统计看板。
+ * 图表色板基于主题（墨蓝/暖金/石板灰），Tooltip/Legend 自定义样式适配深色模式。
+ */
+
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useTheme } from 'next-themes';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { EmptyState, LoadingState } from '@/components/states';
+import { StatCard } from '@/components/ui/stat-card';
+import { PageHeader } from '@/components/ui/page-header';
+import { statsApi } from '@/lib/api';
+import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
+import { usePageTitle } from '@/lib/use-page-title';
+import { ORDER_STATUS_LABEL, ORDER_STATUS_BADGE, QUOTE_STATUS_LABEL } from '@/lib/status';
+import { formatMoney, formatCompactMoney, cn } from '@/lib/utils';
+import type { StatsData, StatsRange } from '@idle-fish/shared';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  BarChart,
+  Bar,
+  ReferenceLine,
+} from 'recharts';
+import type { TooltipProps } from 'recharts';
+import { BarChart3, AlertTriangle } from 'lucide-react';
+const RANGES: { key: StatsRange; label: string }[] = [
+  { key: '7d', label: '近 7 天' },
+  { key: '30d', label: '近 30 天' },
+  { key: '90d', label: '近 90 天' },
+  { key: 'all', label: '全部' },
+];
+
+// 图表色板按主题取档：图形对卡面需 ≥3:1（1.4.11）。实测暗色下墨蓝 1.59:1、shipped 2.62、
+// cancelled 2.82、亮色下品牌金 2.19 均不足，故分主题给值；色相与 lib/status.ts 徽章变体
+// 一一对应（secondary/accent/warning/default/success/destructive）不变。
+const CHART_LIGHT = {
+  blue: '#1E3A5F', // 墨蓝 - 报价（亮色 11.2:1）
+  gold: '#a08040', // 深金 - 订单/利润（品牌金亮色 2.19:1 不足，降档后 3.65:1）
+};
+const CHART_DARK = {
+  blue: '#5B84B1', // 提亮墨蓝（#1E3A5F 暗色 1.59:1 不足，提亮后 4.7:1）
+  gold: '#C9A961', // 品牌金（暗色 8.1:1）
+};
+const STATUS_LIGHT: Record<string, string> = {
+  pending: '#78716C', // 暖灰 - secondary
+  producing: '#a08040', // 深金 - accent
+  ready: '#D97706', // amber-600 - warning
+  shipped: '#3E5C7A', // 墨蓝 - default(primary)
+  done: '#059669', // emerald-600 - success
+  cancelled: '#B91C1C', // red-700 - destructive
+};
+const STATUS_DARK: Record<string, string> = {
+  pending: '#78716C',
+  producing: '#C9A961', // 品牌金（暗色直接达标）
+  ready: '#D97706',
+  shipped: '#56799B', // 提亮墨蓝
+  done: '#059669',
+  cancelled: '#EF4444', // red-500（red-700 暗色 2.82:1 不足）
+};
+
+const AXIS_TICK = { fontSize: 11, fill: 'hsl(var(--muted-foreground))' };
+
+/** 自定义 Tooltip：卡片样式适配深色模式 */
+function ChartTooltip({ active, payload, label }: TooltipProps<number, string>) {
+  if (!active || !payload || payload.length === 0) return null;
+  return (
+    <div className="rounded-md border bg-card px-3 py-2 text-xs shadow-md">
+      {label && <div className="mb-1 font-medium text-foreground">{label}</div>}
+      {payload.map((p, i) => (
+        <div key={i} className="flex items-center gap-2 tabular">
+          <span className="h-2 w-2 rounded-full" style={{ background: p.color }} />
+          <span className="text-muted-foreground">{p.name}</span>
+          <span className="ml-auto font-medium text-foreground">
+            {/* 只有「利润」序列格式化为金额；label 是 X 轴日期，不是系列名 */}
+            {typeof p.value === 'number' && p.name === '利润' ? formatMoney(p.value) : p.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** 日期格式化：7d/30d/90d 显示 MM-DD，all 显示 YYYY-MM */
+function formatDate(date: string, range: StatsRange): string {
+  if (range === 'all') return date; // 已是 YYYY-MM
+  // date 是 YYYY-MM-DD，取 MM-DD
+  return date.slice(5);
+}
+
+export function DashboardPage() {
+  usePageTitle('经营统计');
+  const navigate = useNavigate();
+  const reducedMotion = usePrefersReducedMotion();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
+  const CHART = isDark ? CHART_DARK : CHART_LIGHT;
+  const STATUS_COLORS = isDark ? STATUS_DARK : STATUS_LIGHT;
+  const [data, setData] = useState<StatsData | null>(null);
+  const [range, setRange] = useState<StatsRange>('30d');
+  // F-06：错误态 + 手动重试（此前失败后永久停留「加载中…」且无重试路径）
+  const [error, setError] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
+
+  useEffect(() => {
+    // 竞态保护：快速切换区间时，废弃慢请求的迟到结果，避免旧区间数据覆盖新区间
+    let cancelled = false;
+    setError(null);
+    setData(null); // 切区间立即清旧数据（评审 CFL-M8）：此前旧区间指标静默滞留、按钮已高亮新区间，口径错位
+    statsApi
+      .get(range)
+      .then((d) => {
+        if (!cancelled) setData(d);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(String(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [range, reloadNonce]);
+
+  if (error) {
+    return (
+      <EmptyState
+        icon={AlertTriangle}
+        text="统计加载失败"
+        hint={error}
+        actionLabel="重试"
+        onAction={() => setReloadNonce((n) => n + 1)}
+      />
+    );
+  }
+  if (!data) return <LoadingState />;
+
+  const pieData = data.statusDistribution
+    .filter((s) => s.count > 0)
+    .map((s) => ({ name: ORDER_STATUS_LABEL[s.status], value: s.count, status: s.status }));
+
+  const showDots = range === '7d';
+
+  return (
+    <div className="space-y-4">
+      <PageHeader
+        title="经营统计"
+        actions={
+          /* 区间选择：移动端可横滚 */
+          <div className="flex gap-1 overflow-x-auto pb-1 sm:pb-0">
+            {RANGES.map((r) => (
+              <Button
+                key={r.key}
+                variant={range === r.key ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setRange(r.key)}
+                className="shrink-0"
+              >
+                {r.label}
+              </Button>
+            ))}
+          </div>
+        }
+      />
+
+      {/* 指标卡：移动端 2 列，PC 4 列 */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard
+          label="报价数"
+          value={String(data.quoteCount)}
+          hint={`总金额 ${formatCompactMoney(data.quoteTotalAmount)}`}
+        />
+        <StatCard label="转订单率" value={`${data.conversionRatePct}%`} />
+        <StatCard
+          label="订单数"
+          value={String(data.orderCount)}
+          hint={`总营收 ${formatCompactMoney(data.orderRevenue)}`}
+        />
+        <StatCard
+          label="总利润"
+          value={formatMoney(data.totalProfit)}
+          hint={`平均毛利率 ${data.avgProfitRatePct}%`}
+          accent={data.totalProfit >= 0 ? 'gold' : 'bad'}
+        />
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-3">
+        {/* 状态分布饼图 */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="label-mono font-semibold text-muted-foreground">订单状态分布</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {pieData.length === 0 ? (
+              <EmptyChart text="暂无订单" />
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={75}
+                    innerRadius={38}
+                    paddingAngle={2}
+                    isAnimationActive={!reducedMotion}
+                  >
+                    {pieData.map((d) => (
+                      <Cell key={d.status} fill={STATUS_COLORS[d.status]} stroke="hsl(var(--card))" strokeWidth={2} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ChartTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+            {/* 状态图例列表（PC + 移动端统一，替代 Recharts Legend） */}
+            {pieData.length > 0 && (
+              <div className="mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1">
+                {pieData.map((d) => (
+                  <div key={d.status} className="flex items-center gap-1.5 text-xs">
+                    <span className="h-2 w-2 rounded-full" style={{ background: STATUS_COLORS[d.status] }} />
+                    <span className="text-muted-foreground">{d.name}</span>
+                    <span className="font-medium tabular">{d.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* 报价+订单数趋势 */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="label-mono font-semibold text-muted-foreground">报价与订单趋势</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.trend.length === 0 ? (
+              <EmptyChart />
+            ) : (
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={data.trend} margin={{ top: 5, right: 8, left: -8, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="date" tick={AXIS_TICK} tickFormatter={(d) => formatDate(d, range)} minTickGap={24} axisLine={false} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={AXIS_TICK} width={32} axisLine={false} tickLine={false} />
+                  <Tooltip content={<ChartTooltip />} />
+                  <Line type="monotone" dataKey="quoteCount" name="报价数" stroke={CHART.blue} strokeWidth={2.5} dot={showDots ? { r: 3, fill: CHART.blue } : false} activeDot={{ r: 4 }} isAnimationActive={!reducedMotion} />
+                  <Line type="monotone" dataKey="orderCount" name="订单数" stroke={CHART.gold} strokeWidth={2.5} dot={showDots ? { r: 3, fill: CHART.gold } : false} activeDot={{ r: 4 }} isAnimationActive={!reducedMotion} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+            {/* 趋势图图例（移动端也显示，便于区分两条线） */}
+            {data.trend.length > 0 && (
+              <div className="mt-1 flex justify-center gap-4">
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="h-2 w-3 rounded-full" style={{ background: CHART.blue }} />
+                  <span className="text-muted-foreground">报价数</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs">
+                  <span className="h-2 w-3 rounded-full" style={{ background: CHART.gold }} />
+                  <span className="text-muted-foreground">订单数</span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 利润趋势 */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="label-mono font-semibold text-muted-foreground">利润趋势</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {data.trend.length === 0 ? (
+            <EmptyChart />
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={data.trend} margin={{ top: 5, right: 8, left: -8, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis dataKey="date" tick={AXIS_TICK} tickFormatter={(d) => formatDate(d, range)} minTickGap={24} axisLine={false} tickLine={false} />
+                <YAxis tick={AXIS_TICK} width={32} axisLine={false} tickLine={false} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'hsl(var(--muted))', opacity: 0.4 }} />
+                {/* 零基线：单笔亏损时整图只有负柱，无基线难以读值 */}
+                <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="4 4" />
+                <Bar dataKey="profit" name="利润" maxBarSize={32} radius={[4, 4, 0, 0]} isAnimationActive={!reducedMotion}>
+                  {data.trend.map((t) => (
+                    <Cell key={t.date} fill={t.profit >= 0 ? CHART.gold : isDark ? '#EF4444' : '#B91C1C'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 最近列表：移动端单列，表格可横滚 */}
+      <div className="grid gap-3 lg:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="label-mono font-semibold text-muted-foreground">最近报价</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 pb-2">
+            {data.recentQuotes.length === 0 ? (
+              <div className="px-6 py-4 text-sm text-muted-foreground">暂无</div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[280px] text-sm">
+                    <tbody>
+                      {data.recentQuotes.map((q) => (
+                        <tr
+                          key={q.id}
+                          onClick={() => navigate(`/quotes/${q.id}`)}
+                          className="cursor-pointer border-b transition-colors last:border-0 hover:bg-secondary/50"
+                        >
+                          <td className="px-4 py-2 tabular font-medium">
+                            <Link
+                              to={`/quotes/${q.id}`}
+                              className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+                            >
+                              {q.quoteNo}
+                            </Link>
+                          </td>
+                          <td className="px-4 py-2 text-right tabular">{formatMoney(q.finalPrice)}</td>
+                          <td className="px-4 py-2 text-right">
+                            <span className={cn('text-xs', q.status === 'converted' ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground')}>
+                              {QUOTE_STATUS_LABEL[q.status]}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-1 border-t px-4 pt-2 text-right">
+                  <Link to="/quotes" className="text-xs text-accent-strong hover:underline">
+                    查看全部报价 →
+                  </Link>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="label-mono font-semibold text-muted-foreground">最近订单</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0 pb-2">
+            {data.recentOrders.length === 0 ? (
+              <div className="px-6 py-4 text-sm text-muted-foreground">暂无</div>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[360px] text-sm">
+                    <tbody>
+                      {data.recentOrders.map((o) => (
+                        <tr
+                          key={o.id}
+                          onClick={() => navigate(`/orders/${o.id}`)}
+                          className="cursor-pointer border-b transition-colors last:border-0 hover:bg-secondary/50"
+                        >
+                          <td className="px-4 py-2 tabular font-medium">
+                            <Link
+                              to={`/orders/${o.id}`}
+                              className="rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+                            >
+                              {o.orderNo}
+                            </Link>
+                          </td>
+                          <td className="px-4 py-2 text-muted-foreground">{o.customerName || '—'}</td>
+                          <td className="px-4 py-2 text-right tabular">{formatMoney(o.actualPrice)}</td>
+                          <td className="px-4 py-2 text-right">
+                            <Badge variant={ORDER_STATUS_BADGE[o.status]} className="text-[10px]">
+                              {ORDER_STATUS_LABEL[o.status]}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="mt-1 border-t px-4 pt-2 text-right">
+                  <Link to="/orders" className="text-xs text-accent-strong hover:underline">
+                    查看全部订单 →
+                  </Link>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function EmptyChart({ text = '暂无数据' }: { text?: string }) {
+  return <EmptyState icon={BarChart3} text={text} className="h-[200px] py-0" />;
+}

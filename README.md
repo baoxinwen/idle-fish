@@ -1,0 +1,110 @@
+# idle-fish — 铝型材机柜报价工具
+
+把「报价 → 订单 → 生产 → 发货」全链路数字化的单用户 Web 工具。
+
+## 技术栈
+
+- **前端**：React 18 + TypeScript + Vite + shadcn/ui + Tailwind CSS
+- **3D**：React Three Fiber + drei
+- **图表**：Recharts
+- **后端**：Node + Express + better-sqlite3
+- **共享**：计价引擎、类型、zod schema（`packages/shared`）
+
+## 开发
+
+```bash
+pnpm install        # 安装依赖
+pnpm dev            # 同时启动前后端
+#   后端: http://localhost:3000  (API + 生产期托管前端)
+#   前端: http://localhost:4173  (开发期 Vite, /api 代理到 3000)
+```
+
+## 构建 & 运行
+
+```bash
+pnpm build          # 构建 shared / client / server
+pnpm start          # 启动后端, 单端口 http://localhost:3000 托管前端
+```
+
+## 测试
+
+```bash
+pnpm test                              # 三个包全部单测（glob 自动收集，新增测试文件免登记）
+pnpm --filter @idle-fish/shared test   # 仅 shared：计价引擎 + schema 校验（node:test）
+pnpm --filter @idle-fish/server test   # 仅 server：路由守卫纯函数（node:test）
+pnpm --filter @idle-fish/client test   # 仅 client：组件/页面行为（vitest + jsdom）
+```
+
+client 的 `pnpm build` 末位附带 sw.js 产物断言（`client/scripts/check-pwa.cjs`）：
+Service Worker 的 runtimeCaching 配置若被静默丢弃，构建直接失败。
+
+## PWA（安装到主屏）
+
+需 **HTTPS** 访问（或 localhost）浏览器才出现「安装应用」；局域网
+`http://<IP>:3000` 直访受浏览器安全策略限制无法安装，登录与数据功能不受影响。
+
+- **弱网快照**：报价/订单/统计、计价参数与登录态探测的 GET 响应进入
+  Service Worker 快照缓存，接口 3 秒超时自动回退上次成功数据；提示条会
+  标明「弱网快照 / 离线快照」，写操作永远以服务端为准
+- **更新提示**：检测到新版本弹常驻 toast「新版本已就绪」，点击「立即刷新」生效
+- **离线缓存清空**：设置页一键归零（Service Worker 异常时的兜底）
+
+## Docker 部署
+
+镜像由 GitHub Actions 自动构建并推送至 GHCR。本地只需 `docker-compose.yml`：
+
+```bash
+# 下载 docker-compose.yml 后执行
+docker compose up -d
+# 访问 http://localhost:3000
+```
+
+数据持久化在 `idle-fish-data` 卷（SQLite 文件）。停止：`docker compose down`，停止并删数据：`docker compose down -v`。
+
+如需自行构建镜像：
+
+```bash
+git clone https://github.com/baoxinwen/idle-fish.git
+cd idle-fish
+docker build -t idle-fish:local .
+# 将 docker-compose.yml 中 image: 一行改为 idle-fish:local，然后
+docker compose up -d
+```
+
+### 首次启动
+
+容器首次启动会自动生成 setup token 并打到日志，用于创建管理员账户：
+
+```bash
+docker logs idle-fish   # 抄取 setup token
+```
+
+打开 `http://<域名>/setup`，填入 token + 用户名 + 密码创建唯一管理员。之后访问 `/login` 登录。
+
+### 部署要点（公网）
+
+- 公网访问经反向代理或隧道（如 nginx/Caddy、Cloudflare Tunnel）终结 HTTPS，应用不自行处理证书
+- 代理需透传真实客户端 IP 的 `X-Forwarded-For`；`IDLE_FISH_TRUST_PROXY` 与代理跳数匹配（单层=1，compose 已设），登录限流才能按真实 IP 生效
+- 会话 cookie 的 Secure 标志按实际连接自适应：HTTPS 访问自动带 Secure，局域网 `http://<IP>:3000` 直访也能正常登录。反代/隧道需回传 `X-Forwarded-Proto: https`（常见代理默认带）；若代理不回传，可设 `IDLE_FISH_COOKIE_SECURE=1` 强制开启
+
+## 目录结构
+
+```
+idle-fish/
+├── docs/              # 内部文档：需求规格 / 技术方案 / 历轮评审与审查记录（不公开）
+├── scripts/           # ci-smoke.sh：推送前本地模拟 CI 门禁（全新 clone + 指定 Node 版本）
+├── packages/
+│   └── shared/      # 前后端共享：类型、zod schema、计价引擎（纯函数）
+├── client/          # React 前端（PWA 配置在 vite.config.ts，产物断言在 scripts/check-pwa.cjs）
+├── server/          # Express + SQLite 后端
+├── data/            # SQLite 数据文件、setup token、运行日志（gitignore，运行时生成）
+├── Dockerfile       # 多阶段构建
+├── docker-compose.yml
+└── .github/workflows/  # 自动构建镜像
+```
+
+
+
+## 许可证
+
+本项目基于 [MIT](./LICENSE) 许可证开源。

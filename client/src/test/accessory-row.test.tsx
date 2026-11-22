@@ -1,0 +1,89 @@
+/**
+ * C-2 组件级回归测试：配件行「数量/单价」逐键输入小数。
+ * 缺陷复现：键入 "12.5"——键入 "." 时 number 输入净化为 ""，受控组件 Number("")=0
+ * 实时回写，react-dom 把 0 写回 DOM 擦掉输入中的内容，最终落库 5 而非 12.5。
+ * 修复后：中间态不提交、不回写，完整值原样可输入。
+ */
+
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { AccessoryRow } from '@/components/quote-form/accessory-row';
+import type { AccessoryItem } from '@idle-fish/shared';
+
+const item: AccessoryItem = { name: '合页', category: 'custom', quantity: 2, unitPrice: 3 };
+
+/**
+ * 桌面网格与移动端各渲染一份输入，两份的可访问名现已同时可达
+ * （移动端 label 已用 htmlFor 关联、桌面端 aria-label），行为同源，取任一即可。
+ */
+function getPriceInput() {
+  return screen.getAllByLabelText('单价')[0];
+}
+function getQuantityInput() {
+  return screen.getAllByLabelText('数量')[0];
+}
+
+describe('AccessoryRow NumCell（C-2）', () => {
+  it('单价逐键输入 "12.5"：onChange 收到 12.5，输入框显示 12.5', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(
+      <AccessoryRow item={item} index={0} onUpdate={onUpdate} nameEditable showRemove={false} />,
+    );
+    const input = getPriceInput() as HTMLInputElement;
+    await user.click(input);
+    await user.keyboard('12.5');
+
+    const unitPriceCalls = onUpdate.mock.calls
+      .map(([, patch]) => (patch as Partial<AccessoryItem>).unitPrice)
+      .filter((v) => v !== undefined);
+    expect(unitPriceCalls.at(-1)).toBe(12.5);
+    expect(unitPriceCalls).not.toContain(0); // 中间态不得把 0 推给计价
+    expect(input.value).toBe('12.5');
+  });
+
+  it('数量逐键输入 "12.5"：经 toCount 整数语义收口为 12，且中间态不得出现 0', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    render(
+      <AccessoryRow item={item} index={0} onUpdate={onUpdate} nameEditable showRemove={false} />,
+    );
+    const input = getQuantityInput() as HTMLInputElement;
+    await user.click(input);
+    await user.keyboard('12.5');
+
+    const quantityCalls = onUpdate.mock.calls
+      .map(([, patch]) => (patch as Partial<AccessoryItem>).quantity)
+      .filter((v) => v !== undefined);
+    // 数量是整数语义（toCount 向下取整，schema 亦约束 int）：12.5 收口为 12，
+    // 缺陷场景是中间态 0 回写擦除输入——此处只断言不出现 0 且终值正确
+    expect(quantityCalls.at(-1)).toBe(12);
+    expect(quantityCalls).not.toContain(0);
+  });
+});
+
+/**
+ * 布局回归（配件名称列被压成 0px）：本组件位于报价/订单页的半宽列内
+ * （lg 起页面双栏、列宽减半），五列定宽网格（固定开销 312px）曾按视口断点
+ * sm: 启用——1024 视口下列宽仅 ~297px，minmax(0,1fr) 的名称列被压到 0px。
+ * 修复：桌面五列网格改由最近 @container 容器的实际宽度决定（≥430px 才启用），
+ * jsdom 无布局引擎，这里锁定结构性契约。
+ */
+describe('AccessoryRow 布局契约（名称列被压成 0px 回归）', () => {
+  it('桌面五列网格由容器查询启用，不按视口断点（sm:）启用', () => {
+    render(<AccessoryRow item={item} index={0} onUpdate={vi.fn()} nameEditable />);
+    const desktopRow = document.querySelector('div[style*="grid-template-columns"][class*="hidden"]');
+    expect(desktopRow).toBeTruthy();
+    expect(desktopRow!.className).toContain('[@container(min-width:430px)]:grid');
+    expect(desktopRow!.className).not.toMatch(/sm:grid/);
+  });
+
+  it('移动端变体由同一容器查询收起，不依赖视口断点', () => {
+    render(<AccessoryRow item={item} index={0} onUpdate={vi.fn()} nameEditable />);
+    const mobileRow = document.querySelector('div[class*="border-border/60 py-2"]');
+    expect(mobileRow).toBeTruthy();
+    expect(mobileRow!.className).toContain('[@container(min-width:430px)]:hidden');
+    expect(mobileRow!.className).not.toMatch(/sm:hidden/);
+  });
+});

@@ -1,0 +1,35 @@
+node_modules
+**/node_modules
+**/dist
+**/.turbo
+
+# 数据与备份
+data/
+backups/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# 开发与测试
+.git
+.gitignore
+.vscode
+.idea
+*.log
+npm-debug.log*
+pnpm-debug.log*
+dev.log
+
+# 文档与截图（构建不需要）
+docs/
+screenshots/
+scripts/
+README.md
+*.md
+
+# 本地配置
+.env
+.env.local
+.prettierrc.json
+.claude

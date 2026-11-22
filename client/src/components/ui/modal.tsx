@@ -1,0 +1,70 @@
+/**
+ * Modal 封装：底层用 vaul（Emil Kowalski）。
+ * 移动端：底部抽屉 + 拖拽关闭 + 橡皮筋物理。
+ * PC：居中卡片 + spring 缩放进出。
+ */
+
+import * as React from 'react';
+import { Drawer } from 'vaul';
+import { X } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
+
+// 宽度经 size prop 控制。此前把 sm:max-w-md 写死在基类里，调用方传 max-w-4xl
+// 属不同 variant 组、会被响应式类在 CSS 序上压过（导出弹窗因此一直卡在 md 宽），故收口于此。
+const SIZE: Record<ModalSize, string> = {
+  sm: 'sm:max-w-sm',
+  md: 'sm:max-w-md',
+  lg: 'sm:max-w-3xl',
+  xl: 'sm:max-w-5xl',
+};
+
+interface ModalProps {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+  /** PC 端内容宽度档位，默认 md */
+  size?: ModalSize;
+  className?: string;
+}
+
+export function Modal({ open, onClose, title, children, size = 'md', className }: ModalProps) {
+  return (
+    <Drawer.Root open={open} onOpenChange={(o) => !o && onClose()} direction="bottom">
+      <Drawer.Portal>
+        {/* backdrop 走 --sidebar 令牌（同 #0b0b0a），不再硬编码色值 */}
+        <Drawer.Overlay className="fixed inset-0 z-50 bg-sidebar/45 backdrop-blur-[2px]" />
+        <Drawer.Content
+          className={cn(
+            // 移动端：底部抽屉，圆角顶部
+            // [&_::after]:hidden 去掉 vaul 内置的 ::after 伪元素（PC 居中时会产生白块）
+            'fixed inset-x-0 bottom-0 z-50 flex max-h-[90vh] flex-col overflow-hidden rounded-t-xl border bg-card shadow-xl outline-none [&_::after]:hidden',
+            // PC：inset-0 + margin auto 居中（不用 transform，避免与 vaul 动画的 inline transform 冲突）
+            'sm:inset-0 sm:m-auto sm:h-fit sm:w-full sm:rounded-xl',
+            SIZE[size],
+            className,
+          )}
+        >
+          {/* 移动端拖拽把手 */}
+          <div className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-muted sm:hidden" />
+          <div className="mb-4 flex items-center justify-between px-5 pt-4">
+            <Drawer.Title className="text-base font-semibold">{title}</Drawer.Title>
+            {/* 关闭钮扩大命中区至 ≥24px（2.5.8），负 margin 不挤标题行 */}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="关闭"
+              className="-mr-2 rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          {/* overscroll-contain：滚到头不带动背后页面（better-ui 滚动包含） */}
+          <div className="overflow-y-auto overscroll-contain px-5 pb-5">{children}</div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
+  );
+}

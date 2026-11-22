@@ -1,0 +1,268 @@
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+
+import {
+  calcQuote,
+  calcCostBreakdown,
+  calcProfileCost,
+  calcTraySuggestedPrice,
+  groupAccessories,
+  calcOrderFinance,
+  calcActualFinance,
+  toInnerSize,
+  genBusinessNo,
+  roundMoney,
+  type QuoteInput,
+} from '../index.js';
+
+const baseInput: QuoteInput = {
+  size: { width: 600, depth: 400, height: 800 },
+  color: 'silver',
+  trayCount: 1,
+  trayUnitPrice: 85,
+  installEnabled: false,
+  freightEnabled: true,
+  accessories: [
+    { name: '三通连接件', category: 'connector', quantity: 8, unitPrice: 2 },
+    { name: 'M5 滑块螺母', category: 'fastener', quantity: 60, unitPrice: 0.5 },
+  ],
+  pricing: {
+    silverPrice: 12.53,
+    blackPrice: 13.8,
+    wastage: 1.05,
+    cuttingFee: 30,
+    installFee: 100,
+    freight: 50,
+    profitRate: 0.2,
+    trayCoeffA: 0.01,
+    trayCoeffB: 10,
+  },
+};
+
+describe('roundMoney', () => {
+  it('四舍五入到分', () => {
+    assert.equal(roundMoney(1.234), 1.23);
+    assert.equal(roundMoney(1.235), 1.24);
+    assert.equal(roundMoney(88.41336), 88.41);
+    assert.equal(roundMoney(74.849), 74.85);
+  });
+
+  it('严格四舍五入（非 toFixed 的趋向偶数）', () => {
+    // 这些用例 toFixed 给出错误结果（1.00、2.67），是历史回归保障
+    assert.equal(roundMoney(1.005), 1.01);
+    assert.equal(roundMoney(2.675), 2.68);
+    assert.equal(roundMoney(0.125), 0.13);
+  });
+
+  it('负数对半值同样严格四舍五入（远离零，M-8）', () => {
+    // 亏损单毛利率：roundMoney(-0.045) 应为 -0.05（Math.round 对 -4.5 向 +∞ 得 -4 → -0.04 是缺陷）
+    assert.equal(roundMoney(-0.045), -0.05);
+    assert.equal(roundMoney(-1.005), -1.01);
+    assert.equal(roundMoney(-2.675), -2.68);
+    // 负数非对半值不受影响
+    assert.equal(roundMoney(-1.234), -1.23);
+    // 零与 -0 边界
+    assert.equal(roundMoney(0), 0);
+    assert.equal(roundMoney(-0.001), -0);
+  });
+});
+
+describe('toInnerSize', () => {
+  it('外径减 40 得内径', () => {
+    assert.deepEqual(toInnerSize({ width: 600, depth: 400, height: 800 }), {
+      width: 560,
+      depth: 360,
+      height: 760,
+    });
+  });
+});
+
+describe('calcProfileCost', () => {
+  it('12 条棱总长 = (内径宽+深+高)×4 ÷ 1000', () => {
+    const r = calcProfileCost({ width: 600, depth: 400, height: 800 }, 12.53, 1.05);
+    // 内径 560+360+760 = 1680, ×4 = 6720mm = 6.72m
+    assert.equal(r.totalLength, 6.72);
+    // 6.72 × 12.53 × 1.05 = 88.41336 → 88.41
+    assert.equal(r.cost, 88.41);
+  });
+
+  it('黑色单价高于银色', () => {
+    const silver = calcProfileCost({ width: 600, depth: 400, height: 800 }, 12.53, 1.05);
+    const black = calcProfileCost({ width: 600, depth: 400, height: 800 }, 13.8, 1.05);
+    assert.ok(black.cost > silver.cost);
+  });
+});
+
+describe('calcTraySuggestedPrice', () => {
+  it('面积(万mm²) × A + B', () => {
+    // 600×400 = 240000 mm² = 24 万mm²；24 × 0.01 + 10 = 10.24
+    const p = calcTraySuggestedPrice({ width: 600, depth: 400, height: 800 }, 0.01, 10);
+    assert.equal(p, 10.24);
+  });
+});
+
+describe('groupAccessories', () => {
+  it('按类别分组并计算小计', () => {
+    const groups = groupAccessories(baseInput.accessories);
+    const connector = groups.find((g) => g.category === 'connector');
+    assert.ok(connector);
+    assert.equal(connector!.items.length, 1);
+    assert.equal(connector!.subtotal, 16); // 8 × 2
+    const fastener = groups.find((g) => g.category === 'fastener');
+    assert.equal(fastener!.subtotal, 30); // 60 × 0.5
+  });
+});
+
+describe('calcCostBreakdown（托盘作为配件项，新模型）', () => {
+  it('配件含托盘项时 accessoryTotal 计入托盘，且不重复计费', () => {
+    // legacy 字段给不一致的值，证明以配件行为准
+    const input: QuoteInput = {
+      ...baseInput,
+      trayCount: 999,
+      trayUnitPrice: 999,
+      accessories: [
+        ...baseInput.accessories,
+        { name: '托盘', category: 'tray', quantity: 1, unitPrice: 85 },
+      ],
+    };
+    const b = calcCostBreakdown(input);
+    // 配件：connector 16 + fastener 30 + 托盘 85 = 131
+    assert.equal(b.accessoryTotal, 131);
+    // trayCost 以配件行为准（1×85），忽略不一致的 legacy 字段
+    assert.equal(b.trayCost, 85);
+    // 材料成本 = 铝型材 88.41 + 切割 30 + 配件 131 = 249.41，托盘只算一次
+    assert.equal(b.materialCost, 249.41);
+  });
+
+  it('删除托盘配件项且 trayCount=0 时成本不含托盘', () => {
+    // 注：托盘「删除后不复活」的根治在前端 store（removeAccessory 同步清 trayCount），
+    // 引擎对「无托盘项 + legacy trayCount>0」无法区分旧数据与删除残留，只能按兼容路径处理。
+    const input: QuoteInput = {
+      ...baseInput,
+      trayCount: 0,
+      accessories: baseInput.accessories.filter((a) => a.category !== 'tray'),
+    };
+    const b = calcCostBreakdown(input);
+    assert.equal(b.accessoryTotal, 46); // 16 + 30
+    assert.equal(b.trayCost, 0);
+    assert.equal(b.materialCost, 164.41); // 88.41 + 30 + 46
+  });
+});
+
+describe('calcCostBreakdown', () => {
+  it('材料成本 = 铝型材 + 切割费 + 配件（含托盘）', () => {
+    const b = calcCostBreakdown(baseInput);
+    // 铝型材 88.41 + 切割 30 + 配件 46 + 托盘 85（旧数据无 tray 项，走兼容计入配件总额）= 249.41
+    assert.equal(b.profile.cost, 88.41);
+    assert.equal(b.accessoryTotal, 131); // 46 + 85 托盘
+    assert.equal(b.trayCost, 85);
+    assert.equal(b.materialCost, 249.41);
+    // 未勾选安装费，总成本 = 材料成本 + 运费 50
+    assert.equal(b.installFee, 0);
+    assert.equal(b.totalCost, 299.41);
+  });
+
+  it('勾选安装费后计入总成本', () => {
+    const b = calcCostBreakdown({ ...baseInput, installEnabled: true });
+    assert.equal(b.installFee, 100);
+    assert.equal(b.totalCost, 399.41); // 249.41 + 100 + 50
+  });
+
+  it('未勾选运费则不计入总成本', () => {
+    const b = calcCostBreakdown({ ...baseInput, freightEnabled: false });
+    assert.equal(b.freight, 0);
+    assert.equal(b.totalCost, 249.41); // 249.41 + 0（无安装费无运费）
+  });
+
+  it('运费与安装费均勾选', () => {
+    const b = calcCostBreakdown({ ...baseInput, installEnabled: true, freightEnabled: true });
+    assert.equal(b.freight, 50);
+    assert.equal(b.installFee, 100);
+    assert.equal(b.totalCost, 399.41); // 249.41 + 100 + 50
+  });
+});
+
+describe('calcQuote', () => {
+  it('最终报价 = 总成本 ÷ (1 − 毛利率)', () => {
+    const r = calcQuote(baseInput);
+    // 总成本 299.41, ÷(1-0.2)= ÷0.8 = 374.2625 → 374.26
+    assert.equal(r.breakdown.totalCost, 299.41);
+    assert.equal(r.finalPrice, 374.26);
+    // 利润 = 374.26 − 299.41 = 74.85
+    assert.equal(r.expectedProfit, 74.85);
+    // 毛利率 = 74.85 / 374.26 × 100 ≈ 20.00
+    assert.equal(r.profitRatePct, 20);
+  });
+});
+
+describe('calcOrderFinance', () => {
+  it('预估成本/利润/毛利率', () => {
+    const f = calcOrderFinance(249.41, 30, 20, 400);
+    assert.equal(f.installFee, 30);
+    assert.equal(f.freight, 20);
+    assert.equal(f.otherFee, 50);
+    assert.equal(f.estimatedCost, 299.41);
+    assert.equal(f.estimatedProfit, 100.59);
+    assert.equal(f.estimatedProfitRatePct, 25.15); // 100.59/400×100
+  });
+});
+
+describe('calcActualFinance', () => {
+  it('实际成本 = 材料成本 + 安装费 + 实际运费', () => {
+    const f = calcActualFinance(249.41, 30, 400, 45);
+    assert.equal(f.actualCost, 324.41);
+    assert.equal(f.actualProfit, 75.59);
+  });
+});
+
+describe('genBusinessNo', () => {
+  it('生成报价编号 Q-YYYYMMDD-XX', () => {
+    assert.equal(genBusinessNo('Q', '2026-08-04T10:00:00.000Z', 1), 'Q-20260804-01');
+    assert.equal(genBusinessNo('Q', '2026-08-04T10:00:00.000Z', 12), 'Q-20260804-12');
+    assert.equal(genBusinessNo('O', '2026-08-04', 3), 'O-20260804-03');
+  });
+});
+
+// ---------- 边界分支回归（评审 SHR-M6：此前无测试的已实现逻辑） ----------
+
+describe('边界分支（SHR-M6 测试缺口补齐）', () => {
+  it('空配件列表 + 托盘 0：配件总额归零，材料成本 = 型材 + 切割费', () => {
+    const r = calcCostBreakdown({
+      ...baseInput,
+      trayCount: 0,
+      trayUnitPrice: 0,
+      accessories: [],
+    });
+    assert.equal(r.accessoryTotal, 0);
+    // 型材（600×400×800 银色）88.41 + 切割费 30；配件/托盘均不计入
+    assert.equal(r.materialCost, 118.41);
+    // totalCost = materialCost + freight（freightEnabled: true，运费 50）
+    assert.equal(r.totalCost, 168.41);
+  });
+
+  it('尺寸 < SIZE_GAP：内径 clamp 0，型材成本 0（无负数成本）', () => {
+    const r = calcProfileCost({ width: 30, depth: 30, height: 30 }, 12.53, 1.05);
+    assert.equal(r.inner.width, 0);
+    assert.equal(r.inner.depth, 0);
+    assert.equal(r.inner.height, 0);
+    assert.equal(r.totalLength, 0);
+    assert.equal(r.cost, 0);
+  });
+
+  it('profitRate ≥ 1（denom ≤ 0）：兜底返回总成本即零利润（不抛错不白屏）', () => {
+    const r = calcQuote({
+      ...baseInput,
+      pricing: { ...baseInput.pricing, profitRate: 1 },
+    });
+    assert.equal(r.finalPrice, r.breakdown.totalCost);
+    assert.equal(r.expectedProfit, 0);
+  });
+
+  it('profitRate > 1：同样兜底（finalPrice = totalCost）', () => {
+    const r = calcQuote({
+      ...baseInput,
+      pricing: { ...baseInput.pricing, profitRate: 1.5 },
+    });
+    assert.equal(r.finalPrice, r.breakdown.totalCost);
+  });
+});

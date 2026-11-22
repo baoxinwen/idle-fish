@@ -1,0 +1,28 @@
+services:
+  idle-fish:
+    image: ghcr.io/baoxinwen/idle-fish:latest
+    container_name: idle-fish
+    restart: unless-stopped
+    ports:
+      # 默认绑全部接口（局域网手机直装 PWA 需要）。若仅经同机反代访问，
+      # 建议 "127.0.0.1:3000:3000" 收紧——避免绕过反代直暴登录/备份接口（SRV-M9）
+      - "3000:3000"
+    volumes:
+      - idle-fish-data:/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - IDLE_FISH_HOST=0.0.0.0
+      # 与反代跳数匹配（单层反代/Cloudflare Tunnel = 1；未用反代直暴公网 = 0，否则限流可被伪造 XFF 绕过）
+      - IDLE_FISH_TRUST_PROXY=1
+      - IDLE_FISH_DATA_DIR=/data
+      - TZ=Asia/Shanghai
+      # 日志级别（可选）：默认 info；排障时可临时设 debug/verbose，无需改码重建
+      # - LOG_LEVEL=debug
+      # Cookie Secure 开关（可选）：默认按实际连接自适应——HTTPS 访问带 Secure，
+      # 局域网 HTTP 直访不带，两种场景均可正常登录。
+      # 仅当反代终结 HTTPS 但未回传 X-Forwarded-Proto 时需强制开启：
+      # - IDLE_FISH_COOKIE_SECURE=1
+
+volumes:
+  idle-fish-data:

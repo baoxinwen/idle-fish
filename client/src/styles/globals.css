@@ -1,0 +1,223 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* 高定暖中性色板（铁律1）：层级靠 1%–3% 微明度差分层，禁纯黑。
+       浅色两级：页面 #f5f5f3 → 卡面 #fcfcfb，卡面比页面底亮约 3% 即成浮起，不靠描边。 */
+    --background: 60 9.1% 95.7%; /* #f5f5f3 暖灰白页面底 */
+    --foreground: 60 3.7% 10.6%; /* #1c1c1a 暖黑主文字 */
+    --card: 60 14.3% 98.6%; /* #fcfcfb 卡面，微亮一档 */
+    --card-foreground: 60 3.7% 10.6%;
+    --primary: 60 4% 13%; /* 暖黑主按钮 */
+    --primary-foreground: 60 14.3% 98%;
+    --secondary: 60 5% 92.2%; /* #ececea hover / 次级面 */
+    --secondary-foreground: 60 3.7% 10.6%;
+    --muted: 60 5% 92.2%;
+    --muted-foreground: 44 5% 43%; /* 暖灰次要文字 */
+    --accent: 38 60% 56%; /* #C9A961 暖金强调（保留品牌金，用于填充/图形） */
+    --accent-foreground: 60 3.7% 10.6%;
+    /* 品牌金的文字用档：亮色下原金对纸面仅 2.29:1（<4.5），文字与聚焦环场合用深金（同色相 ~41°，4.5:1+）。
+       暗色下原金即达标（8.8:1），两档同值。 */
+    --accent-strong: 40 50% 33%; /* ≈#7d622a 深金 */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 60 5% 91.5%; /* 发丝线：只作切分提示，层级交给明度差 */
+    --input: 60 5% 91.5%;
+    --ring: 38 60% 56%; /* 暖金聚焦环 */
+    --radius: 0.625rem;
+
+    /* 字重变量（铁律3）：暗色整体 -40 防白字发胖。
+       静态字体下浏览器按最近整档取整，切到变量字体（Inter var）后精确生效。 */
+    --fw-normal: 400;
+    --fw-medium: 500;
+    --fw-semibold: 600;
+    --fw-bold: 700;
+
+    /* 工程软件侧边栏专用深色（暖黑，非纯黑） */
+    --sidebar: 60 4.8% 4.1%; /* #0b0b0a */
+    --sidebar-foreground: 60 5% 90%;
+    --sidebar-accent: 38 60% 56%; /* 暖金选中标记 */
+  }
+
+  .dark {
+    --background: 60 4.8% 4.1%; /* #0b0b0a 最深一级 */
+    --foreground: 60 5% 92%;
+    --card: 0 0% 8.2%; /* #151515 卡面，比底亮一档 */
+    --card-foreground: 60 5% 92%;
+    --primary: 60 14.3% 96%; /* 深色模式主按钮反转为浅色 */
+    --primary-foreground: 60 4% 10%;
+    --secondary: 60 3.2% 12.2%; /* #20201e hover / 选中面 */
+    --secondary-foreground: 60 5% 92%;
+    --muted: 60 3.2% 12.2%;
+    --muted-foreground: 60 4% 62%; /* 次要文字提亮，深色下易读 */
+    --accent: 38 60% 62%; /* 暖金在深色下更亮，保证可见 */
+    --accent-foreground: 60 4% 10%;
+    --accent-strong: 38 60% 62%; /* 暗色下品牌金即达标，与 --accent 同值 */
+    --destructive: 0 62% 55%; /* 红色提亮 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 60 2% 14.5%; /* 卡面与次级面之间的发丝线 */
+    --input: 60 2% 10%; /* #1a1a19 输入框面 */
+    --ring: 38 60% 62%;
+
+    --fw-normal: 360;
+    --fw-medium: 460;
+    --fw-semibold: 560;
+    --fw-bold: 660;
+
+    --sidebar: 60 4.8% 3.2%;
+    --sidebar-foreground: 60 4% 88%;
+    --sidebar-accent: 38 60% 62%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+  /* PC（≥1024px）根字号放大，所有 rem 字号同比增大一档（14→15.4 等），移动端不变 */
+  @media (min-width: 1024px) {
+    html {
+      font-size: 17px;
+    }
+  }
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-weight: var(--fw-normal);
+    font-family:
+      'Inter Variable',
+      'Inter',
+      system-ui,
+      -apple-system,
+      'Microsoft YaHei',
+      sans-serif;
+    /* 铁律6：数字锁等宽，金额、编号、尺寸变化不抖动（font-variant-numeric 属性优先于 raw tag） */
+    font-variant-numeric: tabular-nums;
+    transition:
+      background-color 0.2s,
+      color 0.2s;
+  }
+  /* 铁律8：正文防孤字（单行文本不受影响） */
+  p,
+  li {
+    text-wrap: pretty;
+  }
+  /* 深色模式滚动条 */
+  .dark ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .dark ::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  .dark ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 4px;
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+  /* 数字等宽对齐金额、编号、尺寸 */
+  .tabular,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+  /* prefers-reduced-motion：装饰性动效（页面入场/对勾微弹/卡片抬升/图标旋转/spinner）
+     一律退化为瞬时状态切换——语义由颜色与文字承载，信息不丢。
+     JS 侧动效（spring 数字、图表入场、3D 自转）由 use-prefers-reduced-motion 单独接人。 */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* 工程标签：等宽小号 + 字间距，用于标签、编号、小标题。
+     CJK 回退到正文界面字体——JetBrains 无 CJK 字形，落到 generic monospace
+     会变成未选定的系统衬线体（闲鱼字标等处的事故来源） */
+  .label-mono {
+    font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'Inter Variable',
+      'Microsoft YaHei', sans-serif;
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    font-variant-numeric: tabular-nums;
+  }
+  .font-mono-display {
+    font-family: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'Inter Variable',
+      'Microsoft YaHei', sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  /* 铁律2：输入框聚焦双环咬合——内环贴边（深）+ 外环外扩 3px（浅），不加 outline。
+     内环走 --accent-strong 实色：聚焦指示需对相邻色 ≥3:1（品牌金原值亮色下 2.15:1 不足）。 */
+  .focus-interlock:focus-visible {
+    outline: none;
+    border-color: hsl(var(--accent-strong));
+    box-shadow:
+      inset 0 0 0 1px hsl(var(--accent-strong)),
+      0 0 0 3px hsl(var(--accent) / 0.2);
+  }
+  /* 铁律5：文本流内图标对齐文字视觉中心 */
+  .icon-inline {
+    vertical-align: -0.125em;
+  }
+  /* 铁律9/10：复制成功对勾微弹（欠阻尼 380/18 的关键帧近似：一次过冲 + 一次回弹），
+     2.5s 自熄由组件层负责，这里只管入场。 */
+  @keyframes check-pop {
+    0% {
+      transform: scale(0.5);
+      opacity: 0;
+    }
+    60% {
+      transform: scale(1.18);
+      opacity: 1;
+    }
+    82% {
+      transform: scale(0.94);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  .animate-check-pop {
+    animation: check-pop 0.42s cubic-bezier(0.215, 0.61, 0.355, 1);
+  }
+  /* 可交互卡片 hover 微抬升（Emil 风格物理感），阴影走暖色不偏蓝 */
+  .card-hover {
+    transition:
+      transform 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow:
+      0 4px 12px rgba(28, 25, 18, 0.07),
+      0 2px 4px rgba(28, 25, 18, 0.04);
+  }
+  .dark .card-hover:hover {
+    box-shadow:
+      0 4px 12px rgba(12, 12, 10, 0.45),
+      0 2px 4px rgba(12, 12, 10, 0.35);
+  }
+  /* 页面切换 subtle fade + 上移（Emil 风格） */
+  @keyframes page-enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .page-enter {
+    animation: page-enter 0.2s ease-out;
+  }
+}
